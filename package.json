@@ -1,0 +1,11 @@
+{
+  "name": "apps-garage",
+  "version": "0.0.1",
+  "scripts": {
+    "update-node-bypass-executionpolicy": "powershell -ExecutionPolicy ByPass -File ./powershell/update-node/update-node.ps1",
+    "update-node": "powershell ./powershell/update-node/update-node.ps1"
+  },
+  "devDependencies": {
+    "prettier": "^2.6.2"
+  }
+}

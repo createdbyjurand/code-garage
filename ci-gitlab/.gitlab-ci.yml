@@ -1,0 +1,116 @@
+stages:
+  - update
+  - build
+  - test
+  - deploy
+
+variables:
+  GIT_REPOSITORY_URL: https://:$GIT_ACCESS_TOKEN@gitlab-test.roche.com/act/act-gcp-frontend.git
+  PROJECT_ID: "act-poc-dev"
+  SERVICE_NAME: "act-gcp-frontend"
+  REGION: "europe-west1"
+  IMAGE_NAME: "act-gcp-frontend"
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_TLS_CERTDIR: ""
+
+# update release version number
+update-master:
+  stage: update
+  only:
+    - master
+  image: node:12
+  variables:
+    GIT_STRATEGY: "fetch"
+    GIT_CHECKOUT: "true"
+    GIT_DEPTH: "5"
+  before_script:
+    - cat /etc/os-release
+    - uname -r
+    - apt-get update
+    - apt-get install -y jq
+    - node -v
+    - npm -v
+    - git --version
+    - jq --version
+  script:
+    - node release-version-number-update.node.js --build=${BITBUCKET_BUILD_NUMBER} --branch=develop
+    - git status
+    - git add .
+    - git status
+    - git commit -m "[ci skip] GITLAB CI release version number update"
+    - git status
+    - git push $GIT_REPOSITORY_URL develop
+  after_script:
+    - git push --tags
+    - git push -o ci.skip
+  artifacts:
+    paths:
+      - build/
+      - node_modules/
+    expire_in: 1 days
+    when: always
+  cache:
+    key: release-version-number-update-key
+    paths:
+      - node_modules/
+
+develop-update:
+  only:
+    - develop
+  image: node:12
+  variables:
+    GIT_STRATEGY: "fetch"
+    GIT_CHECKOUT: "true"
+    GIT_DEPTH: "5"
+  stage: update
+  before_script:
+    - apt-get update
+  script:
+    - node -v
+    - npm -v
+    - node release-version-number-update.node.js
+    - git status
+    - git add .
+    - git status
+    - git commit -m "GITLAB CI release version number update"
+    - git status
+    - git push $GIT_REPOSITORY_URL develop
+  artifacts:
+    paths:
+      - build/
+      - node_modules/
+    expire_in: 1 days
+    when: always
+  cache:
+    key: release-version-number-update-key
+    paths:
+      - node_modules/
+
+# build-and-push-docker-container-to-gcp-job:
+build:
+  only:
+    - master
+  stage: build-and-push-docker-container-to-gcp-stage
+  image: docker:19
+  services:
+    - docker:19-dind
+  before_script:
+    - echo $CLOUDRUN_CICD_SA_KEY > ${HOME}/service_key.json
+    - cat ${HOME}/service_key.json | docker login -u _json_key --password-stdin https://eu.gcr.io
+  script:
+    - docker build --compress --tag eu.gcr.io/$PROJECT_ID/$IMAGE_NAME:latest .
+    - docker push eu.gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
+
+# deploy-new-service-in-gcp-job:
+deploy:
+  only:
+    - master
+  stage: deploy-new-service-in-gcp-stage
+#  image: google/cloud-sdk:latest
+#  image: google/cloud-sdk:slim
+  image: google/cloud-sdk:alpine
+  before_script:
+    - echo $CLOUDRUN_CICD_SA_KEY > ${HOME}/service_key.json
+  script:
+    - gcloud auth activate-service-account --key-file ${HOME}/service_key.json
+    - gcloud run deploy $SERVICE_NAME --region $REGION --project $PROJECT_ID --image eu.gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  --platform="managed" --region $region

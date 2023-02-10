@@ -1,0 +1,13 @@
+https://github.com/tonsky/FiraCode
+https://github.com/tonsky/FiraCode/releases
+https://github.com/tonsky/FiraCode/wiki/VS-Code-Instructions
+
+"editor.fontFamily": "Fira Code",
+"editor.fontFamily": "Fira Code Retina",
+
+"editor.fontLigatures": true,
+
+"editor.fontWeight": "300" // Light
+"editor.fontWeight": "400" // Regular
+"editor.fontWeight": "500" // Medium
+"editor.fontWeight": "600" // Bold

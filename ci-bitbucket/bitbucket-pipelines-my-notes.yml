@@ -1,0 +1,161 @@
+# Use [skip ci] when you are pushing back to your repository.
+# This will stop pipelines triggering on the new commit and avoid an eternal loop!
+
+# https://confluence.atlassian.com/bitbucket/push-back-to-your-repository-962352710.html
+# https://confluence.atlassian.com/bitbucket/configure-bitbucket-pipelines-yml-792298910.html
+# https://bitbucket-pipelines.prod.public.atl-paas.net/validator
+# https://confluence.atlassian.com/bitbucket/variables-in-pipelines-794502608.html
+
+# Bitbucket global variables:
+# ${BITBUCKET_GIT_HTTP_ORIGIN}
+# ${BITBUCKET_GIT_SSH_ORIGIN}
+
+# Docker-in-Docker
+# https://github.com/jpetazzo/dind
+
+# You can specify a custom docker image from Docker Hub as your build environment.
+image: node:12
+
+pipelines:
+#  default:
+#    - step:
+#        name: pipelines/default/step 1
+#        deployment: development # Environment name and order needs to be defined in your deployment settings.
+#        caches:
+#          - node
+#        script:
+#          - echo "pipelines/default/step 1"
+#          - echo "node -v"
+#          - node -v
+#          - echo "npm -v"
+#          - npm -v
+#          - echo "git --version"
+#          - git --version
+#    - step:
+#        name: pipelines/default/step 2
+#        script:
+#          - echo "pipelines/default/step 2"
+#          - echo "apk update"
+#          - apk update
+#          - echo "apk upgrade"
+#          - apk upgrade
+#          - echo "apk add --no-cache bash"
+#          - apk add --no-cache bash
+#          - echo "apk add --no-cache git"
+#          - apk add --no-cache git
+#          - echo "apk add --no-cache openssh"
+#          - apk add --no-cache openssh
+#          - echo "node -v"
+#          - node -v
+#          - echo "npm -v"
+#          - npm -v
+#          - echo "git --version"
+#          - git --version
+#    - step:
+#        name: pipelines/default/step 3
+#        trigger: manual # The first step of a pipeline can't be manually triggered.
+#        script:
+#          - git fetch origin develop:develop
+#          - git checkout develop
+#          - echo "Made a change in build ${BITBUCKET_BUILD_NUMBER}" >> changes.txt
+#          - git add .
+#          - git commit -am "[skip ci] Updating changes.txt with latest build number."
+#          - git push
+#          - git commit -m "Updating changes.txt with latest build number."
+#          - git tag -am "Tagging for release ${BITBUCKET_BUILD_NUMBER}" release-${BITBUCKET_BUILD_NUMBER}
+#          - git tag -am "Tagging for release ${BITBUCKET_BUILD_NUMBER}" release-${BITBUCKET_BUILD_NUMBER}
+#          - git push origin release-${BITBUCKET_BUILD_NUMBER}
+#  pull-requests:
+#    "**":
+#      - step:
+#          caches:
+#            - node
+#          script:
+#            - echo "pull-requests pipeline"
+#            - node -v
+#            - npm -v
+#            - git --version
+  branches:
+#    master:
+#      - parallel:
+#          - step:
+#              name: log node version used
+#              script:
+#                - node -v
+#          - step:
+#              name: log npm version used
+#              script:
+#                - npm -v
+#          - step:
+#              name: log git version used
+#              script:
+#                - git --version
+#      - step:
+#          name: update
+#          script:
+#            - apk update
+#            - apk upgrade
+#      - parallel:
+#          - step:
+#              name: install bash
+#              script:
+#                - apk add --no-cache bash
+#          - step:
+#              name: install git
+#              script:
+#                - apk add --no-cache git
+#          - step:
+#              name: install openssh
+#              script:
+#                - apk add --no-cache openssh
+#      - step:
+#          name: pipelines/default/step 3
+#          script:
+#            - git fetch origin develop:develop
+#            - git checkout develop
+#            - echo "Made a change in build ${BITBUCKET_BUILD_NUMBER}" >> changes.txt
+#            - node
+#            - git add .
+#            - git commit -am "[skip ci] Updating changes.txt with latest build number."
+#            - git push
+#            - git commit -m "Updating changes.txt with latest build number."
+#            - git tag -am "Tagging for release ${BITBUCKET_BUILD_NUMBER}" release-${BITBUCKET_BUILD_NUMBER}
+#            - git tag -am "Tagging for release ${BITBUCKET_BUILD_NUMBER}" release-${BITBUCKET_BUILD_NUMBER}
+#            - git push origin release-${BITBUCKET_BUILD_NUMBER}
+    develop:
+      - parallel:
+          - step:
+              name: log node version used
+              caches:
+                - node
+              script:
+                - node -v
+          - step:
+              name: log npm version used
+              caches:
+                - node
+              script:
+                - npm -v
+          - step:
+              name: log git version used
+              caches:
+                - node
+              script:
+                - git --version
+      - step:
+          name: pipelines/default/step 3
+          caches:
+            - node
+          script:
+            - git status
+#            - git checkout develop
+            - node release-version-number-update.node.js
+            - git status
+            - git add .
+            - git status
+            - git commit -m "[skip ci] Bitbucket build number ${BITBUCKET_BUILD_NUMBER} with lightweight tag"
+            - git tag build-${BITBUCKET_BUILD_NUMBER} # To create a lightweight tag, don’t supply any of the -a, -s, or -m options, just provide a tag name.
+#            - git commit -m "[skip ci] Bitbucket build number ${BITBUCKET_BUILD_NUMBER} with annotated tag"
+#            - git tag -a build-${BITBUCKET_BUILD_NUMBER} -m "Annotated Tagging build-${BITBUCKET_BUILD_NUMBER}"
+#            - git push
+            - git push origin build-${BITBUCKET_BUILD_NUMBER}

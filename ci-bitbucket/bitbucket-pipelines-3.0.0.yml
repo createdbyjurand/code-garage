@@ -1,0 +1,217 @@
+definitions:
+  services:
+    redis:
+      image: redis:3.2
+      memory: 512
+    docker:
+      memory: 512 # reduce memory for docker-in-docker from 1GB to 512MB
+    mysql:
+      image: mysql:5.7
+      # memory: 1024  # default value
+      variables:
+        MYSQL_DATABASE: my-db
+        MYSQL_ROOT_PASSWORD: $password
+  caches:
+    gradlewrapper: ~/.gradle/wrapper
+options:
+  max-time:
+  size:
+clone:
+  depth: 1
+pipelines:
+  pull-requests:
+    feature/*:
+      - step:
+          script:
+            -
+    bugfix/*:
+      - step:
+          script:
+            -
+  branches:
+    meteo-backend:
+      - parallel:
+          - step:
+              name: meteo-backend
+              image: gradle:6.0-jdk11
+              caches:
+                - gradle
+                - gradlewrapper
+#              services:
+#                - redis
+#                - mysql
+#                - docker
+              script:
+                - cat /etc/os-release
+                - uname -r
+                - apt-get update
+                - apt-get install -y jq lftp
+                - java --version
+                - gradle --version
+                - git --version
+                - jq --version
+                - lftp --version
+                - cd meteo-backend
+                - gradle wrapper
+                ###########################
+#                - bash ./gradlew clean
+#                - bash ./gradlew test
+#                - bash ./gradlew build
+#                - bash ./gradlew war
+#                - bash ./gradlew clean build
+#                - bash ./gradlew assembleDebug
+#                - gradleOptions: '-Xmx3072m'
+#                - gradle test --no-daemon --build-cache --gradle-user-home=/codefresh/volume/.gradle -Dmaven.repo.local=/codefresh/volume/m2
+#                # Testing gradle
+#                - ./gradlew testDebugUnitTest
+#                # Build apk and distribute
+#                - chmod a+x ./gradlew
+#                - ./gradlew assembleDebug crashlyticsUploadDistributionDebug
+#                - export GRADLE_USER_HOME=`pwd`/.gradle
+#                - chmod +x ./gradlew
+#                - ./gradlew assembleDebug
+#                - ./gradlew build
+#              services:
+#                - redis
+    meteo-backend-develop:
+      - parallel:
+          - step:
+              name: meteo-backend-develop
+              image: node:12
+              caches:
+                - node
+              script:
+                - cat /etc/os-release
+                - uname -r
+                - apt-get update
+                - apt-get install -y jq lftp
+                - node -v
+                - npm -v
+                - git --version
+                - jq --version
+                - lftp --version
+                - cd meteo-backend
+                - node release-version-number-update.node.js --build=${BITBUCKET_BUILD_NUMBER} --branch=develop
+                - readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version.number' release-version-number.json)"
+                - git status
+                - git add .
+                - git status
+                - git commit -m "[skip ci] release version number ${RELEASE_VERSION_NUMBER}, bitbucket build number ${BITBUCKET_BUILD_NUMBER}"
+                - git status
+                - git tag
+                - git tag -a master-release-${RELEASE_VERSION_NUMBER}-build-${BITBUCKET_BUILD_NUMBER} -m "Git Annotated Tag"
+                - git tag
+                - git push --tags
+                - git status
+                - git push
+                - git status
+    meteo-frontend:
+      - parallel:
+          - step:
+              name: meteo-frontend
+              image: node:12
+              caches:
+                - node
+              script:
+                - cat /etc/os-release
+                - uname -r
+                - apt-get update
+                - apt-get install -y jq lftp
+                - node -v
+                - npm -v
+                - git --version
+                - jq --version
+                - lftp --version
+                - cd meteo-frontend
+                - node release-version-number-update.node.js --build=${BITBUCKET_BUILD_NUMBER}
+                - readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version' release-version-number.json)"
+                - git status
+                - git add .
+                - git status
+                - git commit -m "[skip ci] release version number ${RELEASE_VERSION_NUMBER}, bitbucket build number ${BITBUCKET_BUILD_NUMBER}"
+                - git status
+                - git tag
+                - git tag -a master-release-${RELEASE_VERSION_NUMBER}-build-${BITBUCKET_BUILD_NUMBER} -m "Git Annotated Tag"
+                - git tag
+                - git push --tags
+                - git status
+                - git push
+                - git status
+                - npm i
+                - npm i -g @angular/cli
+                - npm i -g create-react-app
+                - npm run build
+                - ls -al
+                - lftp -e "mirror --delete --delete-first --reverse --verbose=3 ./build /public_nodejs/public/meteo" -u ${MD_P_FTP_USERNAME},${MD_P_FTP_PASSWORD} ${MD_P_FTP_HOST}
+    meteo-frontend-develop:
+      - parallel:
+          - step:
+              name: meteo-frontend-develop
+              image: node:12
+              caches:
+                - node
+              script:
+                - cat /etc/os-release
+                - uname -r
+                - apt-get update
+                - apt-get install -y jq lftp
+                - node -v
+                - npm -v
+                - git --version
+                - jq --version
+                - lftp --version
+                - cd meteo-frontend
+                - node release-version-number-update.node.js --build=${BITBUCKET_BUILD_NUMBER}
+                - readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version' release-version-number.json)"
+                - git status
+                - git add .
+                - git status
+                - git commit -m "[skip ci] release version number ${RELEASE_VERSION_NUMBER}, bitbucket build number ${BITBUCKET_BUILD_NUMBER}"
+                - git status
+                - git tag
+                - git tag -a master-release-${RELEASE_VERSION_NUMBER}-build-${BITBUCKET_BUILD_NUMBER} -m "Git Annotated Tag"
+                - git tag
+                - git push --tags
+                - git status
+                - git push
+                - git status
+                - npm i
+                - npm run build
+                - ls -al
+                - lftp -e "mirror --delete --delete-first --reverse --verbose=3 ./build /public_nodejs/public/meteo" -u ${MD_P_FTP_USERNAME},${MD_P_FTP_PASSWORD} ${MD_P_FTP_HOST}
+    meteo-swagger:
+      - parallel:
+          - step:
+              name: meteo-swagger
+              image: node:12
+              caches:
+                - node
+              script:
+                - cat /etc/os-release
+                - uname -r
+                - apt-get update
+                - apt-get install -y jq lftp
+                - node -v
+                - npm -v
+                - git --version
+                - jq --version
+                - lftp --version
+                - cd meteo-swagger
+                - node release-version-number-update.node.js --build=${BITBUCKET_BUILD_NUMBER}
+                - readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version' release-version-number.json)"
+                - git status
+                - git add .
+                - git status
+                - git commit -m "[skip ci] release ${RELEASE_VERSION_NUMBER} build ${BITBUCKET_BUILD_NUMBER}"
+                - git status
+                - git tag
+                - git tag -a master-release-${RELEASE_VERSION_NUMBER}-build-${BITBUCKET_BUILD_NUMBER} -m "Git Annotated Tag"
+                - git tag
+                - git push --tags
+                - git status
+                - git push
+                - git status
+                - npm i
+                - npm run build
+                - ls -al
+                - lftp -e "mirror --delete --delete-first --reverse --verbose=3 ./build /public_nodejs/public/meteo" -u ${MD_P_FTP_USERNAME},${MD_P_FTP_PASSWORD} ${MD_P_FTP_HOST}
