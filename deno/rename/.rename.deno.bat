@@ -1,1 +1,1 @@
-cmd /k "E:\github\apps-garage\deno\rename\rename.deno.bat"
+cmd /k "E:\github\code-garage\deno\rename\rename.deno.bat"
