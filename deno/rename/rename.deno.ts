@@ -19,38 +19,84 @@ for (const dirEntry of Deno.readDirSync(path)) {
   if (dirEntry.isFile) rename(dirEntry.name, dirEntry.name.split(' ').join('.'), 'RENAME SPACES TO DOTS');
 }
 
-const getTitle = (fileName: string) => fileName.slice(0, fileName.search(/\.s\d\de\d\d\./));
-const getSeasonNumber = (fileName: string) =>
-  +fileName.slice(fileName.search(/\.s\d\de\d\d\./) + 2, fileName.search(/\.s\d\de\d\d\./) + 4);
-const getEpisodeNumber = (fileName: string) =>
-  +fileName.slice(fileName.search(/\.s\d\de\d\d\./) + 5, fileName.search(/\.s\d\de\d\d\./) + 7);
-
 const fileNames: string[] = [];
 
 for (const dirEntry of Deno.readDirSync(path)) {
   if (dirEntry.isFile) fileNames.push(dirEntry.name);
 }
 
-fileNames.map((fileName, index, array) => {
-  if (fileName.match(/^.*\.s\d\de\d\d\..*\.url$/)) {
-    const title = getTitle(fileName);
-    const seasonNumber = getSeasonNumber(fileName);
-    const episodeNumber = getEpisodeNumber(fileName);
+fileNames.sort();
+
+const EPISODE_REGEXP = /[^s\d]\d\d\./;
+const SEASON_EPISODE_REGEXP = /\.s\d\de\d\d\./;
+
+const slicePrefix = (fileName: string, regexp: RegExp, changeStart = 0, changeEnd = 0): string =>
+  fileName.slice(0 + changeStart, fileName.search(regexp) + changeEnd);
+
+const sliceNumber = (fileName: string, regexp: RegExp, before = 0, after = 0): number =>
+  +fileName.slice(fileName.search(regexp) + before, fileName.search(regexp) + after);
+
+fileNames.forEach((fileName, index, array) => {
+  if (
+    fileName.match(new RegExp(`^.*${SEASON_EPISODE_REGEXP.toString().slice(1, -1)}.*\.url$`)) ||
+    fileName.match(new RegExp(`^.*${SEASON_EPISODE_REGEXP.toString().slice(1, -1)}url$`))
+  ) {
+    const urlPrefix = slicePrefix(fileName, SEASON_EPISODE_REGEXP, 0, 2);
+    const urlSeasonNumber = sliceNumber(fileName, SEASON_EPISODE_REGEXP, 2, 4);
+    const urlEpisodeNumber = sliceNumber(fileName, SEASON_EPISODE_REGEXP, 5, 7);
+
+    // console.log(' ');
+    // console.log(`   ┌ fileName: "${fileName}"`);
+    // console.log(`   ┠ urlPrefix: "${urlPrefix}"`);
+    // console.log('   ┠ urlSeasonNumber:', urlSeasonNumber);
+    // console.log('   └ urlEpisodeNumber:', urlEpisodeNumber);
+
     let i = index;
+
     while (
       i + 1 < array.length &&
-      title === getTitle(array[i + 1]) &&
-      seasonNumber === getSeasonNumber(array[i + 1]) &&
-      episodeNumber + 1 + i - index === getEpisodeNumber(array[i + 1])
+      urlPrefix === slicePrefix(array[i + 1], SEASON_EPISODE_REGEXP, 0, 2) &&
+      urlSeasonNumber === sliceNumber(array[i + 1], SEASON_EPISODE_REGEXP, 2, 4) &&
+      urlEpisodeNumber + i - index + 1 <= sliceNumber(array[i + 1], SEASON_EPISODE_REGEXP, 5, 7)
     )
       i++;
+
     if (i > index) {
       console.log(' ');
       console.log('┌─── RENAME URL START');
       console.log('| ┌─', fileName);
       const newFileName = array[i].slice(0, array[i].lastIndexOf('.')) + '.url';
-      let n = index + 1;
-      while (n <= i) console.log('| | ', array[n++]);
+      let j = index + 1;
+      while (j <= i) console.log('| | ', array[j++]);
+      console.log('| └>', newFileName);
+      Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
+      console.log(`└─── RENAME URL END`);
+    }
+  } else if (fileName.match(new RegExp(`^.*${EPISODE_REGEXP.toString().slice(1, -1)}.*\.url$`))) {
+    const urlPrefix = slicePrefix(fileName, EPISODE_REGEXP, 0, 1);
+    const urlEpisodeNumber = sliceNumber(fileName, EPISODE_REGEXP, 1, 3);
+
+    // console.log(' ');
+    // console.log(`   ┌ fileName: "${fileName}"`);
+    // console.log(`   ┠ urlPrefix: "${urlPrefix}"`);
+    // console.log('   └ urlEpisodeNumber:', urlEpisodeNumber);
+
+    let i = index;
+
+    while (
+      i + 1 < array.length &&
+      urlPrefix === slicePrefix(array[i + 1], EPISODE_REGEXP, 0, 1) &&
+      urlEpisodeNumber + 1 + i - index === sliceNumber(array[i + 1], EPISODE_REGEXP, 1, 3)
+    )
+      i++;
+
+    if (i > index) {
+      console.log(' ');
+      console.log('┌─── RENAME URL START');
+      console.log('| ┌─', fileName);
+      const newFileName = array[i].slice(0, array[i].lastIndexOf('.')) + '.url';
+      let j = index + 1;
+      while (j <= i) console.log('| | ', array[j++]);
       console.log('| └>', newFileName);
       Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
       console.log(`└─── RENAME URL END`);
