@@ -1,0 +1,15 @@
+{
+    "arrowParens": "avoid",
+    "endOfLine": "crlf",
+    "overrides": [
+        {
+            "files": ["*.java", "*.json", "*.jsonc", "*.json5"],
+            "options": {
+                "tabWidth": 4
+            }
+        }
+    ],
+    "printWidth": 100,
+    "singleAttributePerLine": true,
+    "singleQuote": true
+}

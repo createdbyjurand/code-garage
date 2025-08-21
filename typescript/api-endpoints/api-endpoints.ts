@@ -7,9 +7,9 @@ export const apiEndpoints = {
       search: (name: string) => `${baseUrl}?search=${name}`,
       details: (id: number) => `${baseUrl}/${id}`,
       contacts: (id: number) => `${baseUrl}/${id}/contacts`,
-      pageWithSearch: (pageNumber: number, searchText: string) => `${baseUrl}?page=${pageNumber}&search=${searchText}`,
+      pageWithSearch: (pageNumber: number, searchText: string) =>
+        `${baseUrl}?page=${pageNumber}&search=${searchText}`,
       page: (pageNumber: number) => `${baseUrl}?page=${pageNumber}`,
-
     };
   })(),
 
@@ -42,3 +42,4 @@ export const apiEndpoints = {
     };
   })(),
 };
+Deno.register('', () => {});

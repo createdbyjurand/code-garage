@@ -1,0 +1,45 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+
+name: PR Check
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+jobs:
+  build:
+    name: Unit Tests, Lint and Sonar
+    runs-on: [linux, self-hosted, external-k8s]
+
+    strategy:
+      matrix:
+        node-version: [16.16.0]
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v3
+      - name: setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - name: Configure NPM
+        env:
+          ARTIFACTORY_TOKEN: ${{secrets.ARTIFACTORY_API_TOKEN}}
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm config set @monsantoit:registry https://artifactory.bayer.com/artifactory/api/npm/npm-platforms-engineering/
+          npm config set @groot:registry https://artifactory.bayer.com/artifactory/api/npm/npm-platforms-engineering/
+          npm config set //artifactory.bayer.com/artifactory/api/npm/npm-platforms-engineering/:_auth $ARTIFACTORY_TOKEN
+
+      - run: npm install
+      - run: npm run lint
+      - run: npm run test:ci
+      - uses: sonarsource/sonarqube-scan-action@master
+        name: Sonarqube checks
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
