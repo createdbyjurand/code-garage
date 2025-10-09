@@ -1,13 +1,17 @@
 const path = './';
 
-const rename = (fileName: string, newFileName: string, message: string) => {
-  if (fileName !== newFileName) {
-    console.log(' ');
-    console.log(`┌─ ${message} START`);
-    console.log('|', fileName);
-    console.log('|', newFileName);
-    Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
-    console.log(`└─ ${message} END`);
+const rename = (fileName: string, newFileName: string, message: string): void => {
+  try {
+    if (fileName !== newFileName) {
+      console.log(' ');
+      console.log(`┌─ ${message} START`);
+      console.log('|', fileName);
+      console.log('|', newFileName);
+      Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
+      console.log(`└─ ${message} END`);
+    }
+  } catch (err) {
+    console.error(`Error renaming ${fileName}:`, err);
   }
 };
 
@@ -118,6 +122,160 @@ fileNames.forEach((fileName, index, array) => {
 });
 
 // Rename subtitle file
+
+/*
+
+const ignoreInFileName = [
+  /^1080p$/i,
+  /^720p$/i,
+  /^480p$/i,
+  /^2160p$/i,
+  /^4k$/i,
+  /^divx$/i,
+  /^xvid$/i,
+  /^x264$/i,
+  /^x265$/i,
+  /^hevc$/i,
+  /^h264$/i,
+  /^h265$/i,
+  /^aac$/i,
+  /^ac3$/i,
+  /^dts$/i,
+  /^bluray$/i,
+  /^brrip$/i,
+  /^webrip$/i,
+  /^web$/i,
+  /^dl$/i,
+  /^hdrip$/i,
+  /^dvdrip$/i,
+  /^proper$/i,
+  /^repack$/i,
+  /^internal$/i,
+  /^5\.1$/i,
+  /^7\.1$/i,
+  /^atmos$/i,
+];
+
+const splitRegex = /[.,_()\/\\\-\s\[\]]+/;
+
+const extractRelevantWords = (fileName: string): string[] =>
+  fileName
+    .toLowerCase()
+    .split(splitRegex)
+    .filter(Boolean)
+    .filter(word => !ignoreInFileName.some(rx => rx.test(word)));
+
+const getMatchPercentage = (videoWords: string[], subtitleWords: string[]): number => {
+  if (videoWords.length === 0) return 0;
+  const matches = videoWords.filter(word => subtitleWords.includes(word)).length;
+  return Math.round((matches / videoWords.length) * 100);
+};
+
+const findBestMatch = (
+  referenceFileName: string,
+  possibleMatches: string[]
+): { match: string; matchPercent: number } | null => {
+  const referenceWords = extractRelevantWords(referenceFileName);
+  let bestMatch: { match: string; matchPercent: number } | null = null;
+
+  for (const match of possibleMatches) {
+    const matchWords = extractRelevantWords(match);
+    const matchPercent = getMatchPercentage(referenceWords, matchWords);
+
+    if (!bestMatch || matchPercent > bestMatch.matchPercent) bestMatch = { match, matchPercent };
+  }
+
+  return bestMatch;
+};
+
+// const findBestSubtitleMatch = (
+//   videoFileName: string,
+//   subtitleFileNames: string[]
+// ): { subtitleFileName: string; matchPercent: number } | null => {
+//   const videoWords = extractRelevantWords(videoFileName);
+//   let bestMatch: { subtitleFileName: string; matchPercent: number } | null = null;
+
+//   for (const subtitleFileName of subtitleFileNames) {
+//     const subtitleWords = extractRelevantWords(subtitleFileName);
+//     const matchPercent = getMatchPercentage(videoWords, subtitleWords);
+
+//     if (!bestMatch || matchPercent > bestMatch.matchPercent)
+//       bestMatch = { subtitleFileName, matchPercent };
+//   }
+
+//   return bestMatch;
+// };
+
+// const findBestVideoFileMatch = (
+//   subtitleFileName: string,
+//   videoFileNames: string[]
+// ): { videoFileName: string; matchPercent: number } | null => {
+//   const subtitleWords = extractRelevantWords(subtitleFileName);
+//   let bestMatch: { videoFileName: string; matchPercent: number } | null = null;
+
+//   for (const videoFileName of videoFileNames) {
+//     const videoWords = extractRelevantWords(videoFileName);
+//     const matchPercent = getMatchPercentage(videoWords, subtitleWords);
+
+//     if (!bestMatch || matchPercent > bestMatch.matchPercent)
+//       bestMatch = { videoFileName, matchPercent };
+//   }
+
+//   return bestMatch;
+// };
+
+// Collect video and subtitle files
+
+const videoExtensions = ['.mkv', '.mp4', '.avi'];
+const subtitleExtensions = ['.srt', '.txt'];
+
+const videoFiles: string[] = [];
+const subtitleFiles: string[] = [];
+
+for (const dirEntry of Deno.readDirSync(path)) {
+  if (dirEntry.isFile) {
+    const fileName = dirEntry.name;
+    const ex = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+
+    if (videoExtensions.includes(ex)) videoFiles.push(fileName);
+    else if (subtitleExtensions.includes(ex)) subtitleFiles.push(fileName);
+  }
+}
+
+// Match subtitles to video files
+
+console.log('\n=== Matching Subtitles to Video Files ===\n');
+
+for (const videoFile of videoFiles) {
+  const match = findBestMatch(videoFile, subtitleFiles);
+
+  if (match) {
+    const videoWords = extractRelevantWords(videoFile);
+    const subtitleWords = extractRelevantWords(match.match);
+
+    console.log(`\n┌─── Video: ${videoFile}`);
+    console.log(`├─── Video words: [${videoWords.join(', ')}]`);
+    console.log(`├─── Best subtitle match (${match.matchPercent}%): ${match.match}`);
+    console.log(`└─── Subtitle words: [${subtitleWords.join(', ')}]`);
+
+    // If match is good enough, you can rename the subtitle to match the video
+    if (match.matchPercent >= 70) {
+      const videoBaseName = videoFile.slice(0, videoFile.lastIndexOf('.'));
+      const subtitleExt = match.match.slice(match.match.lastIndexOf('.'));
+      const newSubtitleName = `${videoBaseName}${subtitleExt}`;
+
+      if (match.match !== newSubtitleName) {
+        // Uncomment to actually rename:
+        // rename(match.subtitle, newSubtitleName, 'Matched subtitle');
+        console.log(`    → Would rename to: ${newSubtitleName}`);
+      }
+    }
+  } else {
+    console.log(`\n✗ No subtitle found for: ${videoFile}`);
+  }
+}
+
+*/
 
 fileNames.length = 0;
 for (const dirEntry of Deno.readDirSync(path)) dirEntry.isFile && fileNames.push(dirEntry.name);
