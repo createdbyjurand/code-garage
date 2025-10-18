@@ -1,5 +1,6 @@
 import { expect } from 'jsr:@std/expect';
 import {
+  destructureSeries,
   extractRelevantWords,
   findBestMatch,
   getBaseName,
@@ -10,6 +11,28 @@ import {
   isValidMatch,
   MIN_MATCH_PERCENT,
 } from './rename.deno.ts';
+
+/// destructureSeries
+
+Deno.test('destructureSeries', async t => {
+  await t.step('should destructure series', () => {
+    // console.log(destructureSeries('s01e02'));
+    expect(destructureSeries('s01e02')).toEqual({
+      prefix: '',
+      season: '01',
+      episode: '02',
+      postfix: '',
+    });
+
+    // console.log(destructureSeries('eq.pcx-1260p.2025.S03E07-1080p.divx.mkv'));
+    expect(destructureSeries('eq.pcx-1260p.2025.S03E07-1080p.divx.mkv')).toEqual({
+      prefix: 'eq.pcx-1260p.2025.',
+      season: '03',
+      episode: '07',
+      postfix: '-1080p.divx.mkv',
+    });
+  });
+});
 
 /// extractRelevantWords
 
