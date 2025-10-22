@@ -70,6 +70,8 @@ export const cutPatterns: RegExp[] = [
   /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i,
 ] as const;
 
+export const splitRegex = /[^a-zA-Z0-9]+/;
+
 /// HELPER FUNCTIONS
 
 export const removeMetadataFromFileName = (fileName: string): string => {
@@ -94,6 +96,17 @@ export const removeMetadataFromFileName = (fileName: string): string => {
 
   return hasExtension ? `${base}.${extension}` : base;
 };
+
+export const extractRelevantWords = (fileName: string): string[] =>
+  removeMetadataFromFileName(fileName.toLowerCase())
+    .split(splitRegex)
+    .filter(Boolean)
+    .filter(
+      word =>
+        !ignoreInFileName.some(rx => rx.test(word)) &&
+        !videoExtensions.has(word) &&
+        !subtitlesExtensions.has(word),
+    );
 
 export const rename = (fileName: string, newFileName: string, message: string): void => {
   try {
@@ -228,20 +241,6 @@ export const findBestMatch = (
 
   return results[0];
 };
-
-export const splitRegex = /[^a-zA-Z0-9]+/;
-
-export const extractRelevantWords = (fileName: string): string[] =>
-  fileName
-    .toLowerCase()
-    .split(splitRegex)
-    .filter(Boolean)
-    .filter(
-      word =>
-        !ignoreInFileName.some(rx => rx.test(word)) &&
-        !videoExtensions.has(word) &&
-        !subtitlesExtensions.has(word),
-    );
 
 export const seriesPattern = /(?<prefix>.*)s(?<season>\d\d)e(?<episode>\d\d)(?<postfix>.*)/i;
 
