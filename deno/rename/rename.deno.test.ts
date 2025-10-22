@@ -10,7 +10,41 @@ import {
   isSamePart,
   isValidMatch,
   MIN_MATCH_PERCENT,
+  removeMetadataFromFileName,
 } from './rename.deno.ts';
+
+/// removeMetadataFromFileName
+
+Deno.test('removeMetadataFromFileName', async t => {
+  await t.step('should remove metadata from file name correctly', () => {
+    const mocks = [
+      // with extensions
+      { fileName: 'movie.name.2025.720p.bluray.mkv', result: 'movie.name.2025.mkv' },
+      { fileName: 'movie.name.mkv', result: 'movie.name.mkv' },
+      { fileName: 'movie.name.2025.7120p.bluray.mkv', result: 'movie.name.2025.7120p.mkv' },
+      { fileName: 'movie.name.[awe.ewa].mkv', result: 'movie.name.mkv' },
+      { fileName: 'movie.name(cde.fg).mkv', result: 'movie.name.mkv' },
+      { fileName: 'movie.name-hackgroup.mkv', result: 'movie.name.mkv' },
+      { fileName: 'movie.name-hackgroup.[dfg.gfd_rty-098].mkv', result: 'movie.name.mkv' },
+
+      // without extensions
+      { fileName: '', result: '' },
+      { fileName: '01', result: '01' },
+      { fileName: 'a', result: 'a' },
+      { fileName: 'movie.name', result: 'movie.name' },
+      { fileName: 'movie.name.bluray', result: 'movie.name' },
+      { fileName: 'movie.name.-bluray', result: 'movie.name' },
+      { fileName: 'movie.name.-bluray-[sdf.fds]', result: 'movie.name' },
+    ];
+
+    mocks.forEach(mock => {
+      const result = removeMetadataFromFileName(mock.fileName);
+      // const tab = '         ';
+      // console.log(`[RESULT] ${mock.fileName}\n${tab}${mock.result}\n${tab}${result}`);
+      expect(result).toBe(mock.result);
+    });
+  });
+});
 
 /// destructureSeries
 

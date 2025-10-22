@@ -12,20 +12,88 @@ export const subtitlesExtensions = Object.freeze(new Set(['srt', 'txt']));
 
 export const urlExtensions = Object.freeze(new Set(['url']));
 
-export const ignoreInFileName = [
-  /^[xh]?26[45]$/i,
-  /^(480|720|1080|2160)p?$/i,
-  /^(blu|br|bluray|ray)$/i,
-  /^(web|webdl|webrip)$/i,
-  /^(dvd|dvdrip)$/i,
-  /^(rip|brrip|hdrip)$/i,
-  /^(aac|ac3|dts|ddp)5?$/i,
-  /^(divx|xvid|hevc)$/i,
-  /^(4k?|hd|1|4|k|p|h|x|mx)$/i,
-  /^(amzn|atmos|byndr|dl|edith|internal|proper|repack|yts)$/i,
+export const yearPattern = /(?:^|\D)(?<year>19[3-9]\d|20[0-3]\d)(?:\D|$)/;
+
+export const ignoreInFileName: RegExp[] = [
+  // resolution
+  /^(?:480|576|720|1080|2160|4320)p?$/i,
+
+  // standalone prefixes
+  /^(?:blu|br|bluray|ray|web(?:dl)?|dl|dvd|4k|8k|u?hd(?:tv)?|tv|amzn|hdr(?:\d+\+?)?|dv|sdr|cam|remux)$/i,
+
+  // prefixes with rip
+  /^(?:br|bd|hd(?:tv)?|tv|cam|dvd|bluray|web|re)?rip$/i,
+
+  // audio codecs
+  /^(?:[ae]?ac3?|dts|ddp?|true(?:hd)?|atmos|mp3|flac)[2357]?$/i,
+
+  // video codecs
+  /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i,
+
+  // languages
+  /^(?:polish|lektor(?:pl)?|pl|(?:pl)?dub(?:pl|bed)?|sub(?:s|pl)?|napisy|multi|eng?|de|ger|fra?|ita?|esp?)$/i,
+
+  // scenes
+  /^(?:proper|repack|internal|readnfo|complete)$/i,
+
+  // editions
+  /^(?:extended|remastered|director'?s|cut|criterion|imax|limited|unrated)$/i,
+] as const;
+
+export const removePatterns: RegExp[] = [
+  // ()
+  /[^a-zA-Z0-9]*\((?:[^)]+)\)/,
+  // []
+  /[^a-zA-Z0-9]*\[(?:[^\]]+)\]/,
+  // -group
+  /[^a-zA-Z0-9]*-[^a-zA-Z0-9]*[a-zA-Z0-9_]+(?=\.[^.]+$|$)/,
+] as const;
+
+export const cutPatterns: RegExp[] = [
+  // series (both regexps are the same)
+  // /(?<=^|[^a-zA-Z0-9])s\d\de\d\d(?=[^a-zA-Z0-9]|$)/i,
+  /(?<![a-zA-Z0-9])s\d\de\d\d(?![a-zA-Z0-9])/i,
+
+  // resolution
+  /^(?:480|576|720|1080|2160|4320)p?$/i,
+
+  // standalone prefixes
+  /^(?:blu|br|bluray|web(?:dl)?|dvd|4k|8k|u?hd(?:tv)?|amzn|nf|hdr(?:\d+\+?)?|dv|sdr|cam|remux)$/i,
+
+  // prefixes with rip
+  /^(?:br|bluray|bd|hd(?:tv)?|tv|cam|dvd|web|re)?rip$/i,
+
+  // audio codecs
+  /^(?:[ae]?ac\d+?|dts|dd(?:p\d+?)?|true(?:hd)?|atmos|mp\d+|flac)$/i,
+
+  // video codecs
+  /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i,
 ] as const;
 
 /// HELPER FUNCTIONS
+
+export const removeMetadataFromFileName = (fileName: string): string => {
+  const clean = removePatterns.reduce((name, re) => name.replace(re, ''), fileName);
+  const lastDot = clean.lastIndexOf('.');
+  const extension = clean.slice(lastDot + 1).toLowerCase();
+  const hasExtension = lastDot > 0 && videoExtensions.has(extension);
+  const base = hasExtension ? clean.slice(0, lastDot) : clean;
+
+  // console.log({ fileName, base, extension, hasExtension, lastDot });
+
+  // matchAll() requires /g flag
+  // TypeError: String.prototype.matchAll called with a non-global RegExp argument
+  const wordPattern = /[a-zA-Z0-9]+/g;
+
+  for (const word of base.matchAll(wordPattern)) {
+    if (cutPatterns.some(re => re.test(word[0]))) {
+      const sliced = base.slice(0, word.index).replace(/[^a-zA-Z0-9]+$/, '');
+      return hasExtension ? `${sliced}.${extension}` : sliced;
+    }
+  }
+
+  return hasExtension ? `${base}.${extension}` : base;
+};
 
 export const rename = (fileName: string, newFileName: string, message: string): void => {
   try {
@@ -42,7 +110,7 @@ export const rename = (fileName: string, newFileName: string, message: string): 
   }
 };
 
-export const fileExists = async (filePath: string): Promise<boolean> => {
+const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     await Deno.stat(filePath);
     return true;
