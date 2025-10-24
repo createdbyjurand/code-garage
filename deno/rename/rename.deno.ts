@@ -12,33 +12,7 @@ export const subtitlesExtensions = Object.freeze(new Set(['srt', 'txt']));
 
 export const urlExtensions = Object.freeze(new Set(['url']));
 
-export const yearPattern = /(?:^|\D)(?<year>19[3-9]\d|20[0-3]\d)(?:\D|$)/;
-
-export const ignoreInFileName: RegExp[] = [
-  // resolution
-  /^(?:480|576|720|1080|2160|4320)p?$/i,
-
-  // standalone prefixes
-  /^(?:blu|br|bluray|ray|web(?:dl)?|dl|dvd|4k|8k|u?hd(?:tv)?|tv|amzn|hdr(?:\d+\+?)?|dv|sdr|cam|remux)$/i,
-
-  // prefixes with rip
-  /^(?:br|bd|hd(?:tv)?|tv|cam|dvd|bluray|web|re)?rip$/i,
-
-  // audio codecs
-  /^(?:[ae]?ac3?|dts|ddp?|true(?:hd)?|atmos|mp3|flac)[2357]?$/i,
-
-  // video codecs
-  /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i,
-
-  // languages
-  /^(?:polish|lektor(?:pl)?|pl|(?:pl)?dub(?:pl|bed)?|sub(?:s|pl)?|napisy|multi|eng?|de|ger|fra?|ita?|esp?)$/i,
-
-  // scenes
-  /^(?:proper|repack|internal|readnfo|complete)$/i,
-
-  // editions
-  /^(?:extended|remastered|director'?s|cut|criterion|imax|limited|unrated)$/i,
-] as const;
+/// REGEXP PATTERNS
 
 export const removePatterns: RegExp[] = [
   // ()
@@ -49,25 +23,41 @@ export const removePatterns: RegExp[] = [
   /[^a-zA-Z0-9]*-[^a-zA-Z0-9]*[a-zA-Z0-9_]+(?=\.[^.]+$|$)/,
 ] as const;
 
+// export const yearPattern = /(?:^|\D)(?<year>19[3-9]\d|20[0-3]\d)(?:\D|$)/;
+export const resolutionPattern = /^(?:480|576|720|1080|2160|4320)p?$/i;
+export const standalonePattern =
+  /^(?:br|blu|bluray|ray|web|webdl|dl|dvd|4k|8k|u?hd(?:tv)?|amzn|nf|hdr(?:\d+\+?)?|dv|sdr|cam|remux)$/i;
+export const seriesPattern =
+  // both regexps are the same
+  // /(?<=^|[^a-zA-Z0-9])s\d\de\d\d(?=[^a-zA-Z0-9]|$)/i;
+  /(?<![a-zA-Z0-9])s\d\de\d\d(?![a-zA-Z0-9])/i;
+export const ripPattern = /^(?:br|bluray|bd|hd(?:tv)?|tv|cam|dvd|web|re)?rip$/i;
+export const audioPattern = /^(?:[ae]?ac\d+?|dts|dd(?:p\d+?)?|true(?:hd)?|atmos|mp\d+|flac)$/i;
+export const videoPattern = /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i;
+export const languagePattern =
+  /^(?:polish|lektor(?:pl)?|pl|(?:pl)?dub(?:pl|bed)?|sub(?:s|pl)?|napisy|multi|eng?|de|ger|fra?|ita?|esp?)$/i;
+export const scenePattern = /^(?:proper|repack|internal|readnfo|complete)$/i;
+export const editionPattern =
+  /^(?:extended|remastered|director'?s|cut|criterion|imax|limited|unrated)$/i;
+
 export const cutPatterns: RegExp[] = [
-  // series (both regexps are the same)
-  // /(?<=^|[^a-zA-Z0-9])s\d\de\d\d(?=[^a-zA-Z0-9]|$)/i,
-  /(?<![a-zA-Z0-9])s\d\de\d\d(?![a-zA-Z0-9])/i,
+  seriesPattern,
+  resolutionPattern,
+  standalonePattern,
+  ripPattern,
+  audioPattern,
+  videoPattern,
+] as const;
 
-  // resolution
-  /^(?:480|576|720|1080|2160|4320)p?$/i,
-
-  // standalone prefixes
-  /^(?:blu|br|bluray|web(?:dl)?|dvd|4k|8k|u?hd(?:tv)?|amzn|nf|hdr(?:\d+\+?)?|dv|sdr|cam|remux)$/i,
-
-  // prefixes with rip
-  /^(?:br|bluray|bd|hd(?:tv)?|tv|cam|dvd|web|re)?rip$/i,
-
-  // audio codecs
-  /^(?:[ae]?ac\d+?|dts|dd(?:p\d+?)?|true(?:hd)?|atmos|mp\d+|flac)$/i,
-
-  // video codecs
-  /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i,
+export const ignoreInFileName: RegExp[] = [
+  resolutionPattern,
+  standalonePattern,
+  ripPattern,
+  audioPattern,
+  videoPattern,
+  languagePattern,
+  scenePattern,
+  editionPattern,
 ] as const;
 
 export const splitRegex = /[^a-zA-Z0-9]+/;
@@ -123,7 +113,7 @@ export const rename = (fileName: string, newFileName: string, message: string): 
   }
 };
 
-const fileExists = async (filePath: string): Promise<boolean> => {
+export const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     await Deno.stat(filePath);
     return true;
@@ -183,8 +173,8 @@ export const hasExactMatch = (
 };
 
 export const isSameEpisodeInSeries = (aFileName: string, bFileName: string): boolean => {
-  const aMatch = aFileName.match(seriesPattern);
-  const bMatch = bFileName.match(seriesPattern);
+  const aMatch = aFileName.match(destructureSeriesPattern);
+  const bMatch = bFileName.match(destructureSeriesPattern);
 
   if (!aMatch?.groups && !bMatch?.groups) return true;
   if (!aMatch?.groups || !bMatch?.groups) return false;
@@ -242,7 +232,8 @@ export const findBestMatch = (
   return results[0];
 };
 
-export const seriesPattern = /(?<prefix>.*)s(?<season>\d\d)e(?<episode>\d\d)(?<postfix>.*)/i;
+export const destructureSeriesPattern =
+  /(?<prefix>.*)s(?<season>\d\d)e(?<episode>\d\d)(?<postfix>.*)/i;
 
 type DestructuredSeries = {
   prefix: string;
@@ -252,7 +243,7 @@ type DestructuredSeries = {
 } | null;
 
 export const destructureSeries = (fileName: string): DestructuredSeries => {
-  const match = fileName.match(seriesPattern);
+  const match = fileName.match(destructureSeriesPattern);
   if (!match?.groups) return null;
   return {
     prefix: match.groups.prefix,
@@ -261,24 +252,6 @@ export const destructureSeries = (fileName: string): DestructuredSeries => {
     postfix: match.groups.postfix,
   };
 };
-
-/// OLD
-
-export const EPISODE_REGEXP = /[^s\d]\d\d\./;
-export const SEASON_EPISODE_REGEXP = /\.s\d\de\d\d\./;
-
-export const slicePrefix = (
-  fileName: string,
-  regexp: RegExp,
-  changeStart = 0,
-  changeEnd = 0,
-): string => fileName.slice(0 + changeStart, fileName.search(regexp) + changeEnd);
-
-export const sliceString = (fileName: string, regexp: RegExp, before = 0, after = 0): string =>
-  fileName.slice(fileName.search(regexp) + before, fileName.search(regexp) + after);
-
-export const sliceNumber = (fileName: string, regexp: RegExp, before = 0, after = 0): number =>
-  +sliceString(fileName, regexp, before, after);
 
 /// RENAME TO LOWERCASE
 
@@ -305,7 +278,7 @@ for (const dirEntry of Deno.readDirSync(path)) {
     if (videoExtensions.has(fileExtension)) videoFileNames.push(dirEntry.name);
     else if (subtitlesExtensions.has(fileExtension)) subtitlesFileNames.push(dirEntry.name);
     else if (urlExtensions.has(fileExtension)) {
-      const match = dirEntry.name.match(seriesPattern);
+      const match = dirEntry.name.match(destructureSeriesPattern);
       if (match?.groups && match.groups.season && match.groups.episode)
         seriesUrlFileNames.push(dirEntry.name);
     }
