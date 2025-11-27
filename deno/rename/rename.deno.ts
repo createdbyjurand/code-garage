@@ -1,6 +1,6 @@
 /// CONFIG
 
-export const path = './';
+export const path = Deno.args[0] ?? './';
 
 export const MIN_MATCH_PERCENT = 70;
 
@@ -16,9 +16,9 @@ export const urlExtensions = Object.freeze(new Set(['url']));
 
 export const removePatterns: RegExp[] = [
   // ()
-  /[^a-zA-Z0-9]*\((?:[^)]+)\)/,
+  /[^a-zA-Z0-9]*\([^\)]+\)/,
   // []
-  /[^a-zA-Z0-9]*\[(?:[^\]]+)\]/,
+  /[^a-zA-Z0-9]*\[[^\]]+\]/,
   // -group
   /[^a-zA-Z0-9]*-[^a-zA-Z0-9]*[a-zA-Z0-9_]+(?=\.[^.]+$|$)/,
 ] as const;
@@ -32,13 +32,13 @@ export const seriesPattern =
   // /(?<=^|[^a-zA-Z0-9])s\d\de\d\d(?=[^a-zA-Z0-9]|$)/i;
   /(?<![a-zA-Z0-9])s\d\de\d\d(?![a-zA-Z0-9])/i;
 export const ripPattern = /^(?:br|bluray|bd|hd(?:tv)?|tv|cam|dvd|web|re)?rip$/i;
-export const audioPattern = /^(?:[ae]?ac\d+?|dts|dd(?:p\d+?)?|true(?:hd)?|atmos|mp\d+|flac)$/i;
+export const audioPattern = /^(?:[ae]?ac\d+?|dts|dd(?:p\d+?)?|truehd|atmos|mp\d+|flac)$/i;
 export const videoPattern = /^(?:[xh]?26[45]|divx|xvid|hevc|avc)$/i;
 export const languagePattern =
   /^(?:polish|lektor(?:pl)?|pl|(?:pl)?dub(?:pl|bed)?|sub(?:s|pl)?|napisy|multi|eng?|de|ger|fra?|ita?|esp?)$/i;
 export const scenePattern = /^(?:proper|repack|internal|readnfo|complete)$/i;
 export const editionPattern =
-  /^(?:extended|remastered|director'?s|cut|criterion|imax|limited|unrated)$/i;
+  /^(?:extended|remastered|director'?s?|cut|criterion|imax|limited|unrated)$/i;
 
 export const cutPatterns: RegExp[] = [
   seriesPattern,
@@ -105,7 +105,12 @@ export const rename = (fileName: string, newFileName: string, message: string): 
       console.log(`┌─ ${message} START`);
       console.log('|', fileName);
       console.log('|', newFileName);
-      Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
+
+      if (fileName.toLowerCase() === newFileName.toLowerCase()) {
+        Deno.renameSync(`${path}${fileName}`, `${path}${fileName}.tmp`);
+        Deno.renameSync(`${path}${fileName}.tmp`, `${path}${newFileName}`);
+      } else Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
+
       console.log(`└─ ${message} END`);
     }
   } catch (err) {
