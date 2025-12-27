@@ -96,12 +96,12 @@ for (const urlFileName of urlFileNames) {
       try {
         const res = await fetch(url);
         const data = await res.text();
-        if (/<div class="msg warn">.*<b>NO RESULTS FOUND...<\/b>/.test(data)) {
+        if (/NO RESULTS FOUND.../i.test(data)) {
           console.log('[ OPENSUBTITLES ] NO RESULTS FOUND...');
-        } else if (/<strong>You are not logged in!<\/strong>/.test(data)) {
+        } else if (/You are not logged in!/i.test(data)) {
           console.log('[ OPENSUBTITLES ] You are not logged in!');
         } else {
-          console.log('[ OPENSUBTITLES ] Unexpected response:', data);
+          console.log('[ OPENSUBTITLES ] Maybe... :)');
         }
       } catch (err) {
         console.log('[ OPENSUBTITLES TRY CATCH ERROR ]', err);
