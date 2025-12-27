@@ -3,7 +3,39 @@
 const ROOT = Deno.args[0] ?? '.';
 const EXTENSIONS = new Set(['txt', 'srt']);
 
-/// REPLACEMENTS REGEXP
+/// REPLACEMENTS
+
+// const replacements: [RegExp, string][] = [
+//   // lowercase
+//   [/¹/g, 'ą'],
+//   [/¿/g, 'ż'],
+//   [/œ/g, 'ś'],
+//   [/Ÿ/g, 'ź'],
+//   [/ê/g, 'ę'],
+//   [/æ/g, 'ć'],
+//   [/ô/g, 'ó'],
+//   [/³/g, 'ł'],
+//   [/ñ/g, 'ń'],
+//   // uppercase
+//   [/¥/g, 'Ą'],
+//   [/¯/g, 'Ż'],
+//   [/Œ/g, 'Ś'],
+//   [//g, 'Ź'],
+//   [/Ê/g, 'Ę'],
+//   [/Æ/g, 'Ć'],
+//   [/Ô/g, 'Ó'],
+//   [/£/g, 'Ł'],
+//   [/Ñ/g, 'Ń'],
+
+//   // cleanup
+//   [/\{\\an\d\}/g, ''],
+//   [/<\/?i>/g, ''],
+// ] as const;
+
+// const isSimpleChar = (regex: RegExp): boolean => {
+//   const src = regex.source;
+//   return src.length === 1 || (src.length === 2 && src[0] === '\\');
+// };
 
 const replacements: Record<string, string> = {
   // lowercase
@@ -30,9 +62,27 @@ const replacementsKeys = Object.keys(replacements).join('');
 const replacementsRegExp = new RegExp(`[${replacementsKeys}]`, 'g');
 // console.log({ replacementsRegExp });
 
+const cleanupRegExp = /\{[^}]*\}|<[^>]+>|\uFEFF/gi;
+
 const applyReplacements = (s: string) => {
-  if (!replacementsRegExp.test(s)) return { result: s, hadReplacements: false };
-  const result = s.replace(replacementsRegExp, match => replacements[match] ?? match);
+  replacementsRegExp.lastIndex = 0;
+  cleanupRegExp.lastIndex = 0;
+
+  if (!replacementsRegExp.test(s) && !cleanupRegExp.test(s))
+    return { result: s, hadReplacements: false };
+
+  replacementsRegExp.lastIndex = 0;
+  cleanupRegExp.lastIndex = 0;
+
+  const result = s
+    .replace(replacementsRegExp, match => replacements[match] ?? match)
+    // { } to tag pozycjonowania z formatu napisów ASS/SSA (Advanced SubStation Alpha).
+    // < > to tag HTML
+    // \uFEFF to Zero Width No-Break Space
+    .replace(cleanupRegExp, match => {
+      console.log('[ CLEANUP ]', JSON.stringify(match));
+      return '';
+    });
   return { result, hadReplacements: result !== s };
 };
 
@@ -216,7 +266,7 @@ for (const path of subtitlesFiles) {
 
   const { result, encoding, hadReplacements, meta } = await smartDecode(raw);
 
-  if (!hadReplacements && encoding === 'utf-8') {
+  if (!hadReplacements && encoding.startsWith('utf-8')) {
     console.log('[  SKIP  ] no replacements and encoding utf-8:', path);
     continue;
   }
