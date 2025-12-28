@@ -4,6 +4,11 @@ import { z } from 'zod';
 
 export const path = Deno.args[0] ?? './';
 export const urlExtensions = Object.freeze(new Set(['url']));
+export const bayCategories: Record<number, string> = {
+  0: 'All',
+  207: 'HD - Movies',
+  208: 'HD - TV shows',
+};
 
 /// ZOD
 
@@ -51,9 +56,11 @@ for (const urlFileName of urlFileNames) {
   const url = urlMatch?.[1]?.trim();
   if (url)
     if (url.includes('thepiratebay') || url.includes('apibay')) {
+      const cat = url.match(/[?&]cat=(\d+)/);
       console.log(
         '[ PIRATEBAY ]',
         url.slice(url.indexOf('?q=') + 3, url.indexOf('&cat=')).replaceAll('+', ' '),
+        cat ? '( ' + bayCategories[+cat[1]] + ' )' : '',
       );
       try {
         const res = await fetch(
