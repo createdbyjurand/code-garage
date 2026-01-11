@@ -132,20 +132,10 @@ for (const urlFileName of urlFileNames) {
         const res = await fetch(url);
         const html = await res.text();
 
-        // const errorMatch = precompiledRegExpErrorMessages.find(([regex]) => regex.test(html));
+        const firstMatch = precompiledRegExpErrorMessages.find(([regex]) => regex.test(html));
 
-        if (/NO RESULTS FOUND.../i.test(html)) {
-          console.log('[ OPENSUBTITLES ] NO RESULTS FOUND...');
-        } else if (/You are not logged in!/i.test(html)) {
-          console.log('[ OPENSUBTITLES ] You are not logged in!');
-        } else if (
-          /Sorry. We have problem with network connection to database server, try reload page./i.test(
-            html,
-          )
-        ) {
-          console.log(
-            '[ OPENSUBTITLES ] Sorry. We have problem with network connection to database server, try reload page.',
-          );
+        if (firstMatch) {
+          console.log('[ OPENSUBTITLES ]', firstMatch[1]);
         } else {
           console.log('[ OPENSUBTITLES ] Maybe... :)');
           const $ = cheerio.load(html);
