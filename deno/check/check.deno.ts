@@ -1,4 +1,7 @@
-import { z } from 'zod';
+// deno-lint-ignore-file no-unversioned-import
+
+import { z } from 'npm:zod';
+import * as cheerio from 'npm:cheerio';
 
 /// CONFIG
 
@@ -9,6 +12,16 @@ export const bayCategories: Record<number, string> = {
   207: 'HD - Movies',
   208: 'HD - TV shows',
 };
+const thisYear = new Date().getFullYear().toString();
+const previousYear = (new Date().getFullYear() - 1).toString();
+
+const precompiledRegExpErrorMessages: [RegExp, string][] = [];
+const errorMessages: string[] = [
+  'NO RESULTS FOUND...',
+  'You are not logged in!',
+  'Sorry. We have problem with network connection to database server, try reload page.',
+];
+for (const em of errorMessages) precompiledRegExpErrorMessages.push([new RegExp(em, 'i'), em]);
 
 /// ZOD
 
@@ -56,43 +69,58 @@ for (const urlFileName of urlFileNames) {
   const url = urlMatch?.[1]?.trim();
   if (url)
     if (url.includes('thepiratebay') || url.includes('apibay')) {
-      const cat = url.match(/[?&]cat=(\d+)/);
-      console.log(
-        '[ PIRATEBAY ]',
-        url.slice(url.indexOf('?q=') + 3, url.indexOf('&cat=')).replaceAll('+', ' '),
-        cat ? '( ' + bayCategories[+cat[1]] + ' )' : '',
-      );
-      try {
-        const res = await fetch(
-          'https://apibay.org/q.php' + url.slice(url.indexOf('?q=')).replaceAll('+', '%20'),
+      const params = new URL(url).searchParams;
+      const cat = params.get('cat');
+      const q = params.get('q');
+      const urls = ['https://apibay.org/q.php?' + params.toString().replaceAll('+', '%20')];
+      if (
+        cat &&
+        (+cat === 0 || +cat === 207) &&
+        q &&
+        (q.includes(thisYear) || q.includes(previousYear))
+      ) {
+        urls.push(
+          urls[0].includes(thisYear)
+            ? urls[0].replace(thisYear, previousYear)
+            : urls[0].replace(previousYear, thisYear),
         );
-        const json = await res.json();
-        const parsed = PirateBayResponseSchema.safeParse(json);
-        if (parsed.success) {
-          const data = parsed.data
-            .filter((d: PirateBayItem) => d.status === 'vip' || d.status === 'trusted')
-            .sort(
-              (a: PirateBayItem, b: PirateBayItem) => Number(b.added ?? 0) - Number(a.added ?? 0),
-            )
-            // .map((d: PirateBayItem) => [
-            //   new Date(d.added * 1000).toLocaleString('sv-SE'),
-            //   d.name,
-            //   d.seeders,
-            // ])
-            .reduce((acc: Record<string, { name: string; seeders: string }>, d: PirateBayItem) => {
-              acc[new Date(Number(d.added) * 1000).toLocaleString('sv-SE')] = {
-                name: d.name,
-                seeders: d.seeders,
-              };
-              return acc;
-            }, {});
-          console.table(data);
-        } else {
-          console.log('[ PIRATEBAY ] Unexpected response:', json);
-        }
-      } catch (err) {
-        console.log('[ PIRATEBAY TRY CATCH ERROR ]', err);
+        urls.sort();
       }
+      for (const u of urls)
+        try {
+          const currentQ = new URL(u).searchParams.get('q');
+          console.log('[ PIRATEBAY ]', currentQ, cat ? '( ' + bayCategories[+cat] + ' )' : '');
+          const res = await fetch(u);
+          const json = await res.json();
+          const parsed = PirateBayResponseSchema.safeParse(json);
+          if (parsed.success) {
+            const data = parsed.data
+              .filter((d: PirateBayItem) => d.status === 'vip' || d.status === 'trusted')
+              .sort(
+                (a: PirateBayItem, b: PirateBayItem) => Number(b.added ?? 0) - Number(a.added ?? 0),
+              )
+              // .map((d: PirateBayItem) => [
+              //   new Date(d.added * 1000).toLocaleString('sv-SE'),
+              //   d.name,
+              //   d.seeders,
+              // ])
+              .reduce(
+                (acc: Record<string, { name: string; seeders: string }>, d: PirateBayItem) => {
+                  acc[new Date(Number(d.added) * 1000).toLocaleString('sv-SE')] = {
+                    name: d.name,
+                    seeders: d.seeders,
+                  };
+                  return acc;
+                },
+                {},
+              );
+            console.table(data);
+          } else {
+            console.log('[ PIRATEBAY ] Unexpected response:', json);
+          }
+        } catch (err) {
+          console.log('[ PIRATEBAY TRY CATCH ERROR ]', err);
+        }
     } else if (url.includes('opensubtitles')) {
       console.log(
         '[ OPENSUBTITLES ]',
@@ -102,13 +130,36 @@ for (const urlFileName of urlFileNames) {
       );
       try {
         const res = await fetch(url);
-        const data = await res.text();
-        if (/NO RESULTS FOUND.../i.test(data)) {
+        const html = await res.text();
+
+        // const errorMatch = precompiledRegExpErrorMessages.find(([regex]) => regex.test(html));
+
+        if (/NO RESULTS FOUND.../i.test(html)) {
           console.log('[ OPENSUBTITLES ] NO RESULTS FOUND...');
-        } else if (/You are not logged in!/i.test(data)) {
+        } else if (/You are not logged in!/i.test(html)) {
           console.log('[ OPENSUBTITLES ] You are not logged in!');
+        } else if (
+          /Sorry. We have problem with network connection to database server, try reload page./i.test(
+            html,
+          )
+        ) {
+          console.log(
+            '[ OPENSUBTITLES ] Sorry. We have problem with network connection to database server, try reload page.',
+          );
         } else {
           console.log('[ OPENSUBTITLES ] Maybe... :)');
+          const $ = cheerio.load(html);
+          const titles = $('#search_results tr td:nth-child(2)')
+            .map((_, el) =>
+              $(el) //
+                .text()
+                .replace(/oglądaj na żywo/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim(),
+            )
+            .get()
+            .filter(Boolean);
+          console.log(titles);
         }
       } catch (err) {
         console.log('[ OPENSUBTITLES TRY CATCH ERROR ]', err);
