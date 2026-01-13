@@ -65,10 +65,22 @@ urlFileNames.sort();
 
 for (const urlFileName of urlFileNames) {
   const urlFile = Deno.readTextFileSync(urlFileName);
-  const urlMatch = urlFile.match(/^URL=(.+)$/m);
-  const url = urlMatch?.[1]?.trim();
+  const url = urlFile.match(/^URL=(.+)$/m)?.[1]?.trim();
   if (url)
     if (url.includes('thepiratebay') || url.includes('apibay')) {
+      const fileEpisode = urlFileName.match(/s\d+e(\d+)/i)?.[1];
+      const urlEpisode = url.match(/s\d+e(\d+)/i)?.[1];
+      if (fileEpisode && urlEpisode && +fileEpisode !== +urlEpisode - 1) {
+        const newEpisode = (+fileEpisode + 1).toString().padStart(2, '0');
+        const newUrl = url.replace(/(s\d+e)\d+/i, '$1' + newEpisode);
+        const newFile = urlFile.replace(/^URL=.+$/m, 'URL=' + newUrl);
+        console.log('[ UPDATING EPISODE ]', {
+          file: urlFileName,
+          oldUrl: url,
+          newUrl,
+        });
+        Deno.writeTextFileSync(urlFileName, newFile);
+      }
       const params = new URL(url).searchParams;
       const cat = params.get('cat');
       const q = params.get('q');

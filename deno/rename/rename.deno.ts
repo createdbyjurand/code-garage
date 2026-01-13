@@ -127,6 +127,49 @@ export const fileExists = async (filePath: string): Promise<boolean> => {
   }
 };
 
+export const updateUrl = async (fileName: string) => {
+  if (!(await fileExists(`${path}${fileName}`))) {
+    console.log('⚠ File does not exists:', { fileName, path: `${path}${fileName}` });
+    return;
+  }
+
+  const fileEpisode = fileName.match(/s\d+e(\d+)/i)?.[1];
+  if (!fileEpisode) {
+    console.log('[ FILE EPISODE ERROR ]', { fileName, path: `${path}${fileName}`, fileEpisode });
+    return;
+  }
+
+  const file = Deno.readTextFileSync(`${path}${fileName}`);
+
+  const url = file.match(/^URL=(.+)$/m)?.[1]?.trim();
+  if (!url) {
+    console.log('[ URL ERROR ]', { fileName, path: `${path}${fileName}`, url });
+    return;
+  }
+
+  const urlEpisode = url.match(/s\d+e(\d+)/i)?.[1];
+  if (!urlEpisode) {
+    console.log('[ URL EPISODE ERROR ]', { fileName, path: `${path}${fileName}`, urlEpisode });
+    return;
+  }
+
+  if (url.includes('thepiratebay') || url.includes('apibay')) {
+    if (+fileEpisode !== +urlEpisode - 1) {
+      console.log('[ UPDATING EPISODE ]', {
+        fileName,
+        path: `${path}${fileName}`,
+        url,
+        fileEpisode,
+        urlEpisode,
+      });
+      const newEpisode = (+fileEpisode + 1).toString().padStart(2, '0');
+      const newUrl = url.replace(/(s\d+e)\d+/i, '$1' + newEpisode);
+      const newFile = file.replace(/^URL=.+$/m, 'URL=' + newUrl);
+      Deno.writeTextFileSync(`${path}${fileName}`, newFile);
+    }
+  } else console.log('[ UNKNOWN URL ]', { fileName, path: `${path}${fileName}`, url });
+};
+
 export const renameUrl = async (
   fileName: string,
   newFileName: string,
@@ -146,6 +189,7 @@ export const renameUrl = async (
     console.log('| └→', newFileName);
     Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
     console.log(`└─── ${message} END`);
+    updateUrl(newFileName);
   } catch (err) {
     console.error(`Error renaming ${fileName}:`, err);
   }
