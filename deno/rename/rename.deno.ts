@@ -135,7 +135,10 @@ export const updateUrl = async (fileName: string) => {
 
   const fileEpisode = fileName.match(/s\d+e(\d+)/i)?.[1];
   if (!fileEpisode) {
-    console.log('[ FILE EPISODE ERROR ]', { fileName, path: `${path}${fileName}`, fileEpisode });
+    console.log('[ FILE EPISODE ERROR ]', { file: fileName, episode: fileEpisode });
+    return;
+  } else if (fileEpisode === '00') {
+    console.log('[ SKIPPING EPISODE 00 ]', { file: fileName, episode: fileEpisode });
     return;
   }
 
@@ -155,16 +158,15 @@ export const updateUrl = async (fileName: string) => {
 
   if (url.includes('thepiratebay') || url.includes('apibay')) {
     if (+fileEpisode !== +urlEpisode - 1) {
-      console.log('[ UPDATING EPISODE ]', {
-        fileName,
-        path: `${path}${fileName}`,
-        url,
-        fileEpisode,
-        urlEpisode,
-      });
       const newEpisode = (+fileEpisode + 1).toString().padStart(2, '0');
       const newUrl = url.replace(/(s\d+e)\d+/i, '$1' + newEpisode);
       const newFile = file.replace(/^URL=.+$/m, 'URL=' + newUrl);
+      console.log(' ');
+      console.log('[ UPDATING EPISODE ]', {
+        file: fileName,
+        oldUrl: url,
+        newUrl,
+      });
       Deno.writeTextFileSync(`${path}${fileName}`, newFile);
     }
   } else console.log('[ UNKNOWN URL ]', { fileName, path: `${path}${fileName}`, url });
@@ -189,7 +191,6 @@ export const renameUrl = async (
     console.log('| └→', newFileName);
     Deno.renameSync(`${path}${fileName}`, `${path}${newFileName}`);
     console.log(`└─── ${message} END`);
-    updateUrl(newFileName);
   } catch (err) {
     console.error(`Error renaming ${fileName}:`, err);
   }
@@ -312,7 +313,7 @@ for (const dirEntry of Deno.readDirSync(path)) {
 
 for (const dirEntry of Deno.readDirSync(path)) {
   if (dirEntry.isFile)
-    rename(dirEntry.name, dirEntry.name.split(/\s+/).join('.'), 'RENAME SPACES TO DOTS');
+    rename(dirEntry.name, dirEntry.name.split(/[\s\.]+/).join('.'), 'RENAME SPACES TO DOTS');
 }
 
 /// DESTRUCTURE DIRECTORY FILES
@@ -369,6 +370,8 @@ for (const urlFileName of seriesUrlFileNames) {
     // console.log('Will rename to:', { urlFileName, newUrlFileName });
     await renameUrl(urlFileName, newUrlFileName, videoFileNamesInBetween, 'RENAMING URL');
   }
+
+  updateUrl(newUrlFileName);
 }
 
 /// RENAME SUBTITLES
@@ -396,6 +399,7 @@ for (const subtitlesFileName of subtitlesFileNames) {
       continue;
     }
 
+    console.log(' ');
     console.log('Subtitles mismatch');
     console.log('├─ Matched video:', match.result);
     console.log('├─ Subtitles:    ', subtitlesFileName);

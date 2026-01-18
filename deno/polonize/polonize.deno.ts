@@ -62,7 +62,13 @@ const replacementsKeys = Object.keys(replacements).join('');
 const replacementsRegExp = new RegExp(`[${replacementsKeys}]`, 'g');
 // console.log({ replacementsRegExp });
 
-const cleanupRegExp = /\{[^}]*\}|<[^>]+>|\uFEFF/gi;
+//<i>Dwóch najbardziej niesamowitych<
+//tancerzy jakich kiedykolwiek widziałem.</i>
+
+// const cleanupRegExp = /\{[^}]*\}|<[^>]+>|\uFEFF/gi;
+// const cleanupRegExp = /\{(?!\d+\})[^}]*\}|<[^>]+>|\uFEFF/gi;
+// const cleanupRegExp = /\{(?!\d+\})[^}]*\}|<(?:[\r\n]+|[^<>]*>)|\uFEFF/gi;
+const cleanupRegExp = /\{(?!\d+\})[^}]*\}|<(?=[\r\n])|<[^<>]*>|\uFEFF/gi;
 
 const applyReplacements = (s: string) => {
   replacementsRegExp.lastIndex = 0;
@@ -264,7 +270,19 @@ for (const path of subtitlesFiles) {
 
   const raw = await Deno.readFile(path);
 
-  const { result, encoding, hadReplacements, meta } = await smartDecode(raw);
+  // Skip empty files
+  if (raw.length === 0) {
+    console.log('[  SKIP  ] empty file:', path);
+    continue;
+  }
+
+  const { result, encoding, hadReplacements, meta } = smartDecode(raw);
+
+  // Skip whitespace-only files
+  if (result.trim().length === 0) {
+    console.log('[  SKIP  ] whitespace-only file:', path);
+    continue;
+  }
 
   if (!hadReplacements && encoding.startsWith('utf-8')) {
     console.log('[  SKIP  ] no replacements and encoding utf-8:', path);

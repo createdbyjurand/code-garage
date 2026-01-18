@@ -15,13 +15,32 @@ export const bayCategories: Record<number, string> = {
 const thisYear = new Date().getFullYear().toString();
 const previousYear = (new Date().getFullYear() - 1).toString();
 
-const precompiledRegExpErrorMessages: [RegExp, string][] = [];
-const errorMessages: string[] = [
+// openSubtitles
+const openSubtitlesPrecompiledRegExpErrorMessages: [RegExp, string][] = [];
+const openSubtitlesErrorMessages: string[] = [
   'NO RESULTS FOUND...',
   'You are not logged in!',
   'Sorry. We have problem with network connection to database server, try reload page.',
 ];
-for (const em of errorMessages) precompiledRegExpErrorMessages.push([new RegExp(em, 'i'), em]);
+for (const em of openSubtitlesErrorMessages)
+  openSubtitlesPrecompiledRegExpErrorMessages.push([new RegExp(em, 'i'), em]);
+
+// apiBay
+const apiBayPrecompiledRegExpErrorMessages: [RegExp, string][] = [];
+const apiBayErrorMessages: string[] = [
+  'Database maintenance, please check back in 10 minutes.',
+  'apibay.org | 502: Bad gateway',
+];
+for (const em of apiBayErrorMessages)
+  apiBayPrecompiledRegExpErrorMessages.push([new RegExp(em, 'i'), em]);
+
+const ansiColor = {
+  //
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  reset: '\x1b[0m',
+};
 
 /// ZOD
 
@@ -63,27 +82,40 @@ urlFileNames.sort();
 
 /// CHECK
 
+// https://thepiratebay.org/search.php?q=Star+Trek+Starfleet+Academy+1080*&cat=0
+// https://apibay.org/q.php?q=Star%20Trek%20Starfleet%20Academy%201080*&cat=0
+
 for (const urlFileName of urlFileNames) {
   const urlFile = Deno.readTextFileSync(urlFileName);
   const url = urlFile.match(/^URL=(.+)$/m)?.[1]?.trim();
   if (url)
     if (url.includes('thepiratebay') || url.includes('apibay')) {
-      const fileEpisode = urlFileName.match(/s\d+e(\d+)/i)?.[1];
-      const urlEpisode = url.match(/s\d+e(\d+)/i)?.[1];
-      if (fileEpisode && urlEpisode && +fileEpisode !== +urlEpisode - 1) {
-        const newEpisode = (+fileEpisode + 1).toString().padStart(2, '0');
-        const newUrl = url.replace(/(s\d+e)\d+/i, '$1' + newEpisode);
-        const newFile = urlFile.replace(/^URL=.+$/m, 'URL=' + newUrl);
-        console.log('[ UPDATING EPISODE ]', {
-          file: urlFileName,
-          oldUrl: url,
-          newUrl,
-        });
-        Deno.writeTextFileSync(urlFileName, newFile);
-      }
       const params = new URL(url).searchParams;
       const cat = params.get('cat');
       const q = params.get('q');
+      if (!q) continue;
+      const isSeriesRegExp =
+        /[^a-zA-Z0-9]s\d+e\d+[^a-zA-Z0-9]|[^a-zA-Z0-9]s\d+[^a-zA-Z0-9]|season/i;
+      const isSeries = isSeriesRegExp.test(q ?? '');
+      if (!isSeries) {
+        const fileWords = urlFileName
+          .toLowerCase()
+          .split(/[^a-zA-Z0-9]/)
+          .filter(e => [/url/].some(re => !re.test(e)))
+          .join(' ')
+          .trim();
+        const qWords = q
+          .toLowerCase()
+          .split(/[^a-zA-Z0-9]/)
+          .filter(e => [/1080?./].some(re => !re.test(e)))
+          .join(' ')
+          .trim();
+        if (fileWords !== qWords) {
+          console.warn(ansiColor.yellow + '[ PIRATEBAY ] FILENAME AND Q MISMATCH', ansiColor.reset);
+          console.warn(ansiColor.yellow + '    filename:', urlFileName, ansiColor.reset);
+          console.warn(ansiColor.yellow + '        └─ q:', qWords, ansiColor.reset);
+        }
+      }
       const urls = ['https://apibay.org/q.php?' + params.toString().replaceAll('+', '%20')];
       if (
         cat &&
@@ -103,11 +135,28 @@ for (const urlFileName of urlFileNames) {
           const currentQ = new URL(u).searchParams.get('q');
           console.log('[ PIRATEBAY ]', currentQ, cat ? '( ' + bayCategories[+cat] + ' )' : '');
           const res = await fetch(u);
+          // console.log('[ PIRATEBAY ]', { u, res });
+          const contentType = res.headers.get('content-type') || '';
+          if (!contentType.includes('application/json')) {
+            const html = await res.text();
+            const firstMatch = apiBayPrecompiledRegExpErrorMessages.find(([regex]) =>
+              regex.test(html),
+            );
+            if (firstMatch) {
+              console.error(ansiColor.red + '              └─', firstMatch[1], ansiColor.reset);
+            } else {
+              console.error(ansiColor.red + '[ APIBAY UNKNOWN ERROR ]', html, ansiColor.reset);
+            }
+            continue;
+          }
           const json = await res.json();
           const parsed = PirateBayResponseSchema.safeParse(json);
           if (parsed.success) {
             const data = parsed.data
-              .filter((d: PirateBayItem) => d.status === 'vip' || d.status === 'trusted')
+              .filter(
+                (d: PirateBayItem) => d.status === 'vip' || d.status === 'trusted',
+                // && isSeries === isSeriesRegExp.test(d.name),
+              )
               .sort(
                 (a: PirateBayItem, b: PirateBayItem) => Number(b.added ?? 0) - Number(a.added ?? 0),
               )
@@ -128,10 +177,14 @@ for (const urlFileName of urlFileNames) {
               );
             console.table(data);
           } else {
-            console.log('[ PIRATEBAY ] Unexpected response:', json);
+            console.error(
+              ansiColor.red + '[ PIRATEBAY ] Unexpected response:',
+              json,
+              ansiColor.reset,
+            );
           }
         } catch (err) {
-          console.log('[ PIRATEBAY TRY CATCH ERROR ]', err);
+          console.error(ansiColor.red + '[ PIRATEBAY TRY CATCH ERROR ]', err, ansiColor.reset);
         }
     } else if (url.includes('opensubtitles')) {
       console.log(
@@ -144,12 +197,15 @@ for (const urlFileName of urlFileNames) {
         const res = await fetch(url);
         const html = await res.text();
 
-        const firstMatch = precompiledRegExpErrorMessages.find(([regex]) => regex.test(html));
+        const firstMatch = openSubtitlesPrecompiledRegExpErrorMessages.find(([regex]) =>
+          regex.test(html),
+        );
 
         if (firstMatch) {
-          console.log('[ OPENSUBTITLES ]', firstMatch[1]);
+          console.error(ansiColor.red + '                  └─', firstMatch[1], ansiColor.reset);
+          // console.error(ansiColor.red + '[ OPENSUBTITLES ]', firstMatch[1], ansiColor.reset);
         } else {
-          console.log('[ OPENSUBTITLES ] Maybe... :)');
+          console.log(ansiColor.yellow + '[ OPENSUBTITLES ] Maybe... :)' + ansiColor.reset);
           const $ = cheerio.load(html);
           const titles = $('#search_results tr td:nth-child(2)')
             .map((_, el) =>
@@ -164,7 +220,7 @@ for (const urlFileName of urlFileNames) {
           console.log(titles);
         }
       } catch (err) {
-        console.log('[ OPENSUBTITLES TRY CATCH ERROR ]', err);
+        console.error(ansiColor.red + '[ OPENSUBTITLES TRY CATCH ERROR ]', err, ansiColor.reset);
       }
-    } else console.log('[ IF URL ERROR ]', urlFileName);
+    } else console.error(ansiColor.red + '[ IF URL ERROR ]', urlFileName, ansiColor.reset);
 }

@@ -1,0 +1,55 @@
+name: Deploy to MyDevil
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-mydevil-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build for MyDevil
+        run: npm run build:mydevil
+
+      # SSH key do agenta
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MYDEVIL_SSH_KEY }}
+
+      # Known hosts (żeby rsync/ssh nie pytał o fingerprint)
+      - name: Trust MyDevil host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.MYDEVIL_PORT || 22 }} ${{ secrets.MYDEVIL_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy (rsync)
+        run: |
+          rsync -az --delete \
+            --exclude ".env" --exclude ".env.*" \
+            -e "ssh -p ${{ secrets.MYDEVIL_PORT || 22 }}" \
+            deploy-mydevil/ \
+            ${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:${{ secrets.MYDEVIL_TARGET }}
+
+      - name: Restart domain
+        run: |
+          ssh -p ${{ secrets.MYDEVIL_PORT || 22 }} \
+            ${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }} \
+            "devil www restart ${{ secrets.MYDEVIL_DOMAIN }}"

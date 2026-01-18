@@ -1,0 +1,130 @@
+name: ci-master
+
+on:
+  push: { branches: master }
+  pull_request: { branches: master }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # if: ${{ !contains(toJSON(github.event.commits.*.message), '[skip master ci]') }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          ref: master
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 14
+          check-latest: true
+      # - run: cat /etc/os-release
+      # - run: uname -r
+
+      # - run: node -v
+      # - run: npm -v
+      # - run: git --version
+      # - run: jq --version
+      # - run: lftp --version
+      # - run: openssl version -a
+
+      - run: sudo apt update
+
+      # - run: sudo apt install --only-upgrade nodejs
+      # - run: sudo apt install --only-upgrade npm
+      # - run: sudo apt install --only-upgrade git
+      # - run: sudo apt install --only-upgrade jq
+      # - run: sudo apt install --only-upgrade lftp
+
+      # - run: sudo apt install -y nodejs
+      # - run: sudo apt install -y npm
+      # - run: sudo apt install -y git
+      # - run: sudo apt install -y jq
+      - run: sudo apt install -y lftp
+
+      # - run: node -v
+      # - run: npm -v
+      # - run: git --version
+      # - run: jq --version
+      # - run: lftp --version
+      # - run: openssl version -a
+
+      - run: git config user.name "github-actions"
+      - run: git config user.email "github-actions@github.com"
+
+      # - run: ls -al
+      # - run: git status
+
+      # - name: Get default environment variables
+      #   run: |
+      #     jq -n '{}' > default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${CI} '.CI = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${HOME} '.HOME = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_WORKFLOW} '.GITHUB_WORKFLOW = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_RUN_ID} '.GITHUB_RUN_ID = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_RUN_NUMBER} '.GITHUB_RUN_NUMBER = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_ACTION} '.GITHUB_ACTION = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_ACTIONS} '.GITHUB_ACTIONS = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_ACTOR} '.GITHUB_ACTOR = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_REPOSITORY} '.GITHUB_REPOSITORY = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_EVENT_NAME} '.GITHUB_EVENT_NAME = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_EVENT_PATH} '.GITHUB_EVENT_PATH = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_WORKSPACE} '.GITHUB_WORKSPACE = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_SHA} '.GITHUB_SHA = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_REF} '.GITHUB_REF = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_HEAD_REF} '.GITHUB_HEAD_REF = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_BASE_REF} '.GITHUB_BASE_REF = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_SERVER_URL} '.GITHUB_SERVER_URL = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_API_URL} '.GITHUB_API_URL = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     cat default-environment-variables.json | jq --arg value ${GITHUB_GRAPHQL_URL} '.GITHUB_GRAPHQL_URL = $value' > tmp.json && mv tmp.json default-environment-variables.json
+      #     rm -fv tmp.json
+
+      # - name: Prettify json
+      #   run: jq '.' default-environment-variables.json
+
+      # - run: git status
+      # - run: ls -al
+
+      - name: Change release version number
+        run: node node_scripts/release-version-number-update.node.js --branch=master --release=minor --build=${GITHUB_RUN_NUMBER}
+
+      #      - run: git status
+      #      - run: ls -al
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run ci-build
+
+      - name: Upload build
+        env:
+          CI_FTP_USER: ${{ secrets.CI_FTP_USER }}
+          CI_FTP_PASSWORD: ${{ secrets.CI_FTP_PASSWORD }}
+          CI_FTP_HOST: ${{ secrets.CI_FTP_HOST }}
+          CI_FTP_PORT: 21
+          CI_LOCAL_DIRECTORY: ./build
+          CI_FTP_DIRECTORY: /public_nodejs/public
+        run: lftp -d -e "set ftp:ssl-auth TLS; set ftp:ssl-allow true; set ftp:ssl-force true; set ftp:ssl-protect-data true; mirror --delete-first --reverse --verbose=3 ${CI_LOCAL_DIRECTORY} ${CI_FTP_DIRECTORY}" -u ${CI_FTP_USER},${CI_FTP_PASSWORD} ${CI_FTP_HOST} -p ${CI_FTP_PORT}
+
+      # - run: git status
+      # - run: ls -al
+
+      - name: Add tag
+        run: |
+          git tag
+          readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version' release-version-number.json)"
+          git tag -a master-${RELEASE_VERSION_NUMBER} -m "Git Annotated Tag"
+          git tag
+          git push --tags
+
+      # - run: git status
+      # - run: ls -al
+
+      # - name: Commit changes
+      #   run: |
+      #     git add -A
+      #     readonly RELEASE_VERSION_NUMBER="$(jq --raw-output '.version' release-version-number.json)"
+      #     if [[ ! $(git log -1 --pretty=%B) =~ (\[skip master ci\]) ]]; then git commit -m "master-${RELEASE_VERSION_NUMBER}   [skip master ci]" && git push; fi
+
+      # - run: git status
+      # - run: ls -al
