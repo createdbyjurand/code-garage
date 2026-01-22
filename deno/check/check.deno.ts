@@ -130,6 +130,13 @@ for (const urlFileName of urlFileNames) {
         );
         urls.sort();
       }
+      const isEpisodeZero = q.match(/[^a-zA-Z1-9]s\d+e(\d+)[^a-zA-Z0-9]/i)?.[1]?.trim() === '00';
+      if (isEpisodeZero) {
+        const starURL = urls[0].replace(/([^a-zA-Z1-9]s\d+)e00([^a-zA-Z0-9])/i, '$1*$2');
+        // console.log('Adding URL:', starURL);
+        urls.push(starURL);
+        urls.sort();
+      }
       for (const u of urls)
         try {
           const currentQ = new URL(u).searchParams.get('q');
