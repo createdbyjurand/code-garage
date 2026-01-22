@@ -135,9 +135,11 @@ export const updateUrl = async (fileName: string) => {
 
   const fileEpisode = fileName.match(/s\d+e(\d+)/i)?.[1];
   if (!fileEpisode) {
+    console.log(' ');
     console.log('[ FILE EPISODE ERROR ]', { file: fileName, episode: fileEpisode });
     return;
   } else if (fileEpisode === '00') {
+    console.log(' ');
     console.log('[ SKIPPING EPISODE 00 ]', { file: fileName, episode: fileEpisode });
     return;
   }
@@ -146,12 +148,14 @@ export const updateUrl = async (fileName: string) => {
 
   const url = file.match(/^URL=(.+)$/m)?.[1]?.trim();
   if (!url) {
+    console.log(' ');
     console.log('[ URL ERROR ]', { fileName, path: `${path}${fileName}`, url });
     return;
   }
 
   const urlEpisode = url.match(/s\d+e(\d+)/i)?.[1];
   if (!urlEpisode) {
+    console.log(' ');
     console.log('[ URL EPISODE ERROR ]', { fileName, path: `${path}${fileName}`, urlEpisode });
     return;
   }
