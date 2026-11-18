@@ -87,8 +87,13 @@ export const removeMetadataFromFileName = (fileName: string): string => {
   return hasExtension ? `${base}.${extension}` : base;
 };
 
-export const extractRelevantWords = (fileName: string): string[] =>
-  removeMetadataFromFileName(fileName.toLowerCase())
+const relevantWordsCache = new Map<string, string[]>();
+
+export const extractRelevantWords = (fileName: string): string[] => {
+  const cached = relevantWordsCache.get(fileName);
+  if (cached) return cached;
+
+  const words = removeMetadataFromFileName(fileName.toLowerCase())
     .split(splitRegex)
     .filter(Boolean)
     .filter(
@@ -97,6 +102,14 @@ export const extractRelevantWords = (fileName: string): string[] =>
         !videoExtensions.has(word) &&
         !subtitlesExtensions.has(word),
     );
+
+  if (relevantWordsCache.size > 10_000)
+    relevantWordsCache.delete(relevantWordsCache.keys().next().value!);
+  relevantWordsCache.set(fileName, words);
+  return words;
+};
+
+export const clearRelevantWordsCache = () => relevantWordsCache.clear();
 
 export const rename = (fileName: string, newFileName: string, message: string): void => {
   try {
@@ -114,7 +127,7 @@ export const rename = (fileName: string, newFileName: string, message: string): 
       console.log(`└─ ${message} END`);
     }
   } catch (err) {
-    console.error(`Error renaming ${fileName}:`, err);
+    console.error(`⚠ Error renaming ${fileName}:`, err);
   }
 };
 
@@ -124,6 +137,28 @@ export const fileExists = async (filePath: string): Promise<boolean> => {
     return true;
   } catch {
     return false;
+  }
+};
+
+export const stripUrl = async (fileName: string) => {
+  if (!(await fileExists(`${path}${fileName}`))) {
+    console.log('⚠ File does not exists:', { fileName, path: `${path}${fileName}` });
+    return;
+  }
+
+  const file = Deno.readTextFileSync(`${path}${fileName}`);
+
+  const newFile =
+    (
+      file
+        .replace(/^(URL=)(.*)$/gm, (_, prefix, address) => prefix + address.toLowerCase())
+        .match(/^(?:\[InternetShortcut\]|URL=).*$/gm) || []
+    ).join('\r\n') + '\r\n';
+
+  if (file !== newFile) {
+    console.log(' ');
+    console.log('[ STRIPPING URL ]', { file: fileName, old: file, new: newFile });
+    Deno.writeTextFileSync(`${path}${fileName}`, newFile);
   }
 };
 
@@ -216,15 +251,6 @@ export const getBaseName = (fileName: string, extensions: string[]) =>
   extensions.some(e => fileName.toLowerCase().endsWith(e.toLowerCase()))
     ? fileName.slice(0, fileName.lastIndexOf('.'))
     : fileName;
-
-export const hasExactMatch = (
-  fileName: string,
-  fileNames: string[],
-  extensions: string[],
-): boolean => {
-  const baseFileName = getBaseName(fileName, extensions).toLowerCase();
-  return fileNames.some(n => getBaseName(n, extensions).toLowerCase() === baseFileName);
-};
 
 export const isSameEpisodeInSeries = (aFileName: string, bFileName: string): boolean => {
   const aMatch = aFileName.match(destructureSeriesPattern);
@@ -325,6 +351,7 @@ for (const dirEntry of Deno.readDirSync(path)) {
 export const videoFileNames: string[] = [];
 export const subtitlesFileNames: string[] = [];
 export const seriesUrlFileNames: string[] = [];
+export const urlFileNames: string[] = [];
 
 for (const dirEntry of Deno.readDirSync(path)) {
   if (dirEntry.isFile) {
@@ -332,6 +359,7 @@ for (const dirEntry of Deno.readDirSync(path)) {
     if (videoExtensions.has(fileExtension)) videoFileNames.push(dirEntry.name);
     else if (subtitlesExtensions.has(fileExtension)) subtitlesFileNames.push(dirEntry.name);
     else if (urlExtensions.has(fileExtension)) {
+      urlFileNames.push(dirEntry.name);
       const match = dirEntry.name.match(destructureSeriesPattern);
       if (match?.groups && match.groups.season && match.groups.episode)
         seriesUrlFileNames.push(dirEntry.name);
@@ -342,6 +370,11 @@ for (const dirEntry of Deno.readDirSync(path)) {
 videoFileNames.sort();
 subtitlesFileNames.sort();
 seriesUrlFileNames.sort();
+urlFileNames.sort();
+
+/// STRIP URLS
+
+for (const urlFileName of urlFileNames) stripUrl(urlFileName);
 
 /// RENAME SERIES URLS
 
@@ -380,11 +413,14 @@ for (const urlFileName of seriesUrlFileNames) {
 
 /// RENAME SUBTITLES
 
+const videoBaseNames = new Set(
+  videoFileNames.map(v => v.slice(0, v.lastIndexOf('.')).toLowerCase()),
+);
+
 for (const subtitlesFileName of subtitlesFileNames) {
   const subtitleBaseName = subtitlesFileName.slice(0, subtitlesFileName.lastIndexOf('.'));
 
-  if (hasExactMatch(subtitleBaseName, videoFileNames, [...subtitlesExtensions, ...videoExtensions]))
-    continue;
+  if (videoBaseNames.has(subtitleBaseName.toLowerCase())) continue;
 
   const match = findBestMatch(subtitlesFileName, videoFileNames, MIN_MATCH_PERCENT);
 

@@ -5,7 +5,6 @@ import {
   findBestMatch,
   getBaseName,
   getMatchPercentage,
-  hasExactMatch,
   isSameEpisodeInSeries,
   isSamePart,
   isValidMatch,
@@ -127,26 +126,6 @@ Deno.test('getBaseName', async t => {
     );
 
     expect(getBaseName('Movie.2025.720p.bluray', ['srt', 'mkv'])).toBe('Movie.2025.720p.bluray');
-  });
-});
-
-/// hasExactMatch
-
-Deno.test('hasExactMatch', async t => {
-  await t.step('should be true', () => {
-    expect(
-      hasExactMatch(
-        'ANOTHER_WORLD_PART_ONE.1080P.MKV',
-        ['another_world_part_one.1080p.srt'],
-        ['mkv', 'srt'],
-      ),
-    ).toBe(true);
-  });
-
-  await t.step('should be false', () => {
-    expect(hasExactMatch('movie_name.1080p.mkv', ['movie-name.1080p.mkv'], ['mkv', 'srt'])).toBe(
-      false,
-    );
   });
 });
 
