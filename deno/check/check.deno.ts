@@ -137,7 +137,7 @@ for (const urlFileName of urlFileNames) {
         }
       }
       const urls = ['https://apibay.org/q.php?' + params.toString().replaceAll('+', '%20')];
-      if (cat && (+cat === 0 || +cat === 207) && q) {
+      if (cat && (+cat === 0 || +cat === 207) && !/s\d{2}[^a-z0-9]?e(?!00)\d{2}/i.test(q)) {
         if (q.includes(previousYear)) {
           urls.push(urls[0].replace(previousYear, thisYear));
           urls.sort();
