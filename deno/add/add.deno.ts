@@ -11,7 +11,7 @@ if (args.length < 1) {
 const fileName: string =
   args
     .map(arg => arg.replace(fileNameReplacePattern, ' ').trim())
-    .filter(arg => arg.length > 1)
+    .filter(arg => arg.length > 1 && arg !== '1080')
     .join('.')
     .toLowerCase() + '.url';
 
@@ -20,7 +20,7 @@ url.searchParams.set(
   'q',
   args
     .map(arg => arg.replace(urlQRenamePattern, ' ').trim())
-    .filter(arg => arg.length > 0)
+    .filter(arg => arg.length > 0 && arg !== '1080*')
     .join(' ')
     .toLowerCase() + ' 1080*',
 );
