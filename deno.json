@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+        "noImplicitAny": false
+    },
+    "lock": false,
+    "nodeModulesDir": "manual"
+}
