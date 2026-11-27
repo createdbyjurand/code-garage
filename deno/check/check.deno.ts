@@ -425,14 +425,6 @@ do {
 
   if (watch) {
     clearWatchStatus();
-    if (newItems.size)
-      console.table(
-        [...newItems.values()].map(item => ({
-          name: item.name,
-          added: new Date(Number(item.added) * 1000).toLocaleString('sv-SE'),
-          seeders: item.seeders,
-        })),
-      );
     lastCycleNewItems = newItems.size;
     newItems.clear();
     await waitBetweenCycles();
