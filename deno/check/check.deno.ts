@@ -75,21 +75,23 @@ const clearWatchStatus = (): void => {
   if (watch) Deno.stdout.writeSync(new TextEncoder().encode('\x1b[2K\r'));
 };
 const writeWatchStatus = (next?: number): void => {
-  const color = newItems.length > 0 || lastCycleNewItems > 0 ? ansiColor.red : ansiColor.green;
+  const color = newItems.size > 0 || lastCycleNewItems > 0 ? ansiColor.red : ansiColor.green;
   if (watch)
     Deno.stdout.writeSync(
       new TextEncoder().encode(
         // Max 77 chars
-        `[   ${color}WATCH${ansiColor.reset}   ] Cycle: ${color}${cycle}${ansiColor.reset} | Request: ${color}${requestNumber}${ansiColor.reset}/${color}${requestTotal}${ansiColor.reset} | New: ${color}${newItems.length}${ansiColor.reset} | Last: ${color}${lastCycleNewItems}${ansiColor.reset}${next === undefined ? '' : ` | Next: ${color}${formatTime(next)}${ansiColor.reset}`}`,
+        `[   ${color}WATCH${ansiColor.reset}   ] Cycle: ${color}${cycle}${ansiColor.reset} | Request: ${color}${requestNumber}${ansiColor.reset}/${color}${requestTotal}${ansiColor.reset} | New: ${color}${newItems.size}${ansiColor.reset} | Last: ${color}${lastCycleNewItems}${ansiColor.reset}${next === undefined ? '' : ` | Next: ${color}${formatTime(next)}${ansiColor.reset}`}`,
       ),
     );
 };
 const waitWatch = async (minSeconds: number, maxSeconds: number): Promise<void> => {
   const end = Date.now() + randomSeconds(minSeconds, maxSeconds) * 1000;
-  while (Date.now() < end) {
+  while (true) {
+    const remaining = end - Date.now();
+    if (remaining <= 0) break;
     clearWatchStatus();
-    writeWatchStatus(end - Date.now());
-    await wait(Math.min(1000, end - Date.now()));
+    writeWatchStatus(remaining);
+    await wait(Math.min(1000, remaining));
   }
   clearWatchStatus();
 };
@@ -146,9 +148,8 @@ const readUrlFileNames = (): string[] =>
 // https://apibay.org/q.php?q=Star%20Trek%20Starfleet%20Academy%201080*&cat=0
 
 const seenHashes = new Set<string>();
-let newItems: PirateBayItem[] = [];
+const newItems = new Map<string, PirateBayItem>();
 let lastCycleNewItems = 0;
-let initialScan = true;
 let cycle = 0;
 let requestNumber = 0;
 let requestTotal = 0;
@@ -271,9 +272,11 @@ do {
                     Number(b.added ?? 0) - Number(a.added ?? 0),
                 );
               for (const item of items) {
-                if (!initialScan && !seenHashes.has(item.info_hash)) newItems.push(item);
+                if (!seenHashes.has(item.info_hash) && !newItems.has(urlFileName))
+                  newItems.set(urlFileName, item);
                 seenHashes.add(item.info_hash);
               }
+              clearWatchStatus();
               const data = items
                 // .map((d: PirateBayItem) => [
                 //   new Date(d.added * 1000).toLocaleString('sv-SE'),
@@ -422,17 +425,16 @@ do {
 
   if (watch) {
     clearWatchStatus();
-    if (newItems.length)
+    if (newItems.size)
       console.table(
-        newItems.map(item => ({
+        [...newItems.values()].map(item => ({
           name: item.name,
           added: new Date(Number(item.added) * 1000).toLocaleString('sv-SE'),
           seeders: item.seeders,
         })),
       );
-    lastCycleNewItems = newItems.length;
-    newItems = [];
-    initialScan = false;
+    lastCycleNewItems = newItems.size;
+    newItems.clear();
     await waitBetweenCycles();
   }
 } while (watch);
