@@ -36,7 +36,7 @@ Disabled by default. Only when explicitly requested, load and follow the instruc
 - Never run commands without asking for permission. If denied, stop.
 - When suggesting changes, show complete functions and mark changed lines with `// <--`.
 - Never rename variables without permission. Suggest better names only when clearly beneficial.
-- Use UTF-8 with Polish characters and prefer simple punctuation.
+- Use `UTF-8` with Polish characters and prefer simple punctuation.
 - Do not write tests unless explicitly asked.
 
 ## Coding Preferences
