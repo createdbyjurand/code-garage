@@ -1,15 +1,11 @@
 {
     "devDependencies": {
         "@createdbyjurand/node-scripts": "2.1.0-SNAPSHOT",
-        "@types/jest": "30.0.0",
-        "@types/node": "25.0.10",
-        "cheerio": "1.1.2",
-        "jest": "30.2.0",
-        "prettier": "3.8.1",
-        "ts-jest": "29.4.6",
-        "ts-node": "10.9.2",
-        "typescript": "5.9.3",
-        "zod": "4.3.5"
+        "@types/node": "26.6.6",
+        "cheerio": "1.2.0",
+        "prettier": "3.10.1",
+        "typescript": "7.0.2",
+        "zod": "4.6.7"
     },
     "name": "apps-garage",
     "scripts": {
@@ -20,8 +16,7 @@
         "d : outdated": "mv package.json package.json.lock && (deno outdated || true) && mv package.json.lock package.json",
         "d : update": "mv package.json package.json.lock && (deno update --latest || true) && mv package.json.lock package.json",
         "outdated": "npm outdated",
-        "test: deno": "deno test deno/ --parallel --fail-fast --allow-read --watch",
-        "test: jest": "jest",
+        "test : deno": "deno test deno/ --parallel --fail-fast --allow-read --allow-write --allow-run --watch",
         "update dependencies": "update-dependencies@createdbyjurand --all --remove-prefixes",
         "update dependencies --legacy-peer-deps": "update-dependencies@createdbyjurand --all --remove-prefixes --legacy-peer-deps",
         "update node": "powershell ./powershell/update-node/update-node.ps1",
